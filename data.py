@@ -1,6 +1,6 @@
 import torch
 from torchvision import datasets, transforms
-from kymatio.torch import Scattering2D
+# from kymatio.torch import Scattering2D
 import os
 import pickle
 import numpy as np
@@ -23,7 +23,7 @@ import pandas as pd
 from torchvision import transforms
 np.random.seed(51)
 
-import webdataset as wds
+# import webdataset as wds
 import json
 
 

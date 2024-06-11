@@ -7,16 +7,17 @@ from libauc.losses import AUCMLoss, CrossEntropyLoss
 from opacus import PrivacyEngine
 from data import get_data
 from numpy.linalg import norm
-from torch_ema import ExponentialMovingAverage
-from data_normalization import data_normalization, standardize
-from opacus.grad_sample.functorch import make_functional
+# from torch_ema import ExponentialMovingAverage
+# from data_normalization import data_normalization, standardize
+# from opacus.grad_sample.functorch import make_functional
 from torch.func import grad, grad_and_value, vmap
 from opacus.grad_sample import GradSampleModule
 from models import LogisticRegresion, CNN, TwoLayer
 import config   
 import time
 from sklearn.model_selection import ParameterGrid
-import clip_train
+# import clip_train
+import wrn_train
 
 params = config.params
 if params['dataset'].startswith('chexpert') or params['dataset'].startswith('eyepacs'):
@@ -47,5 +48,10 @@ for conf in variables:
 
     result_file_excel.write('name,epochs,privacy,epsilon,delta,max_grad_norm,optim,LR,WS,EMA,BatchSize,input_norm,train_auc,train_auc_std_test_auc,test_auc_std, test_acc\n')
 
+    # import pdb; pdb.set_trace()
+
     if 'clip' in params['baseline']:
         clip_train.train_clip(params)
+
+    elif 'wrn' == params['baseline']:
+        wrn_train.wrn_train(params)
