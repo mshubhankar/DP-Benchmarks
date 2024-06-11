@@ -43,16 +43,16 @@ def print_metrics(pred, true, multi_label=False):
 
 
 def make_features(params, feature_path):
-    if 'g_14' in params['baseline']:
+    if 'g14' in params['baseline']:
         model, _, preprocess = open_clip.create_model_and_transforms('ViT-bigG-14', pretrained='laion2b_s39b_b160k')
         tokenizer = open_clip.get_tokenizer('ViT-bigG-14')
-    elif 'b_16' in params['baseline']:
+    elif 'b16' in params['baseline']:
         model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-16', pretrained='openai')
         tokenizer = open_clip.get_tokenizer('ViT-B-16')
 
     if params['dataset'] == 'chexpert':
         text = tokenizer(['Cardiomegaly', 'Edema', 'Consolidation', 'Atelectasis', 'Pleural Effusion']) #chexpert
-    if params['dataset'] == 'eyepacs_complete':
+    if params['dataset'] == 'eyepacs':
         text = tokenizer(['No Diabetic Retinopathy', 'Mild Diabetic Retinopathy', 'Moderate Diabetic Retinopathy', 'Severe Diabetic Retinopathy', 'Proliferate Diabetic Retinopathy']) #eyepacs
     if params['dataset'] == 'cifar10':
         text = tokenizer(['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']) #cifar10
@@ -60,10 +60,10 @@ def make_features(params, feature_path):
     train_data, test_data = get_data(params['dataset'], preprocess=preprocess, augment=False)
     
     train_loader = torch.utils.data.DataLoader(
-            train_data, batch_size=params['mini_batch_size'], shuffle=False, num_workers=1, pin_memory=True)
+            train_data, batch_size=params['minibatch_size'], shuffle=False, num_workers=1, pin_memory=True)
 
     test_loader = torch.utils.data.DataLoader(
-                test_data, batch_size=params['mini_batch_size'], shuffle=False, num_workers=1, pin_memory=True)
+                test_data, batch_size=params['minibatch_size'], shuffle=False, num_workers=1, pin_memory=True)
 
 
     if params['aug_multiplicity']:
@@ -103,15 +103,15 @@ def make_features(params, feature_path):
             #store output in a numpy file
             if params['aug_multiplicity']:
             
-                torch.save(image_features.cpu().detach(), f'{tmp_path}/{params['dataset']}_aug_{params['n_augs']}_train_X_part{i}.pt')
-                torch.save( target.cpu().detach(), f'{tmp_path}/{params['dataset']}_aug_{params['n_augs']}_train_Y_part{i}.pt')
+                torch.save(image_features.cpu().detach(), f"{tmp_path}/{params['dataset']}_aug_{params['n_augs']}_train_X_part{i}.pt")
+                torch.save( target.cpu().detach(), f"{tmp_path}/{params['dataset']}_aug_{params['n_augs']}_train_Y_part{i}.pt")
             else:
-                torch.save(image_features.cpu().detach(), f'{tmp_path}/{params['dataset']}_train_X_part{i}.pt')
-                torch.save( target.cpu().detach(), f'{tmp_path}/{params['dataset']}_train_Y_part{i}.pt')
+                torch.save(image_features.cpu().detach(), f"{tmp_path}/{params['dataset']}_train_X_part{i}.pt")
+                torch.save( target.cpu().detach(), f"{tmp_path}/{params['dataset']}_train_Y_part{i}.pt")
 
 
         # if test_path does not exist
-        if not os.path.exists(f'{feature_path}/{params['dataset']}_test_X.pt'):
+        if not os.path.exists(f"{feature_path}/{params['dataset']}_test_X.pt"):
             for i, rows in enumerate(tqdm(test_loader)):
                 data, target = rows
                 data, target = data.to(params['device']), target.to(params['device'])
@@ -121,38 +121,38 @@ def make_features(params, feature_path):
 
                 
                 #store output in a numpy file
-                torch.save(image_features.cpu().detach(), f'{tmp_path}/{params['dataset']}_test_X_part{i}.pt')
-                torch.save( target.cpu().detach(), f'{tmp_path}/{params['dataset']}_test_Y_part{i}.pt')
+                torch.save(image_features.cpu().detach(), f"{tmp_path}/{params['dataset']}_test_X_part{i}.pt")
+                torch.save( target.cpu().detach(), f"{tmp_path}/{params['dataset']}_test_Y_part{i}.pt")
 
     print('Combining files')
     full_X = []
     full_Y = []
     # number of files that start with dataset_train_X_part
-    n_train_files = len([name for name in os.listdir(tmp_path) if name.startswith(f'{params['dataset']}_train_X_part')])
-    n_test_files = len([name for name in os.listdir(tmp_path) if name.startswith(f'{params['dataset']}_test_X_part')])
+    n_train_files = len([name for name in os.listdir(tmp_path) if name.startswith(f"{params['dataset']}_train_X_part")])
+    n_test_files = len([name for name in os.listdir(tmp_path) if name.startswith(f"{params['dataset']}_test_X_part")])
 
     for i in tqdm(range(n_train_files)):
-        X = torch.load(tmp_path + f'{params['dataset']}_train_X_part{i}.pt')
-        Y = torch.load(tmp_path + f'{params['dataset']}_train_Y_part{i}.pt')
+        X = torch.load(tmp_path + f"{params['dataset']}_train_X_part{i}.pt")
+        Y = torch.load(tmp_path + f"{params['dataset']}_train_Y_part{i}.pt")
         full_X.append(X)
         full_Y.append(Y)
     full_X = torch.cat(full_X)
     full_Y = torch.cat(full_Y)
 
-    torch.save(full_X, feature_path + f'{params['dataset']}_train_X.pt')
-    torch.save(full_Y, feature_path + f'{params['dataset']}_train_Y.pt')
+    torch.save(full_X, feature_path + f"{params['dataset']}_train_X.pt")
+    torch.save(full_Y, feature_path + f"{params['dataset']}_train_Y.pt")
 
     # if test_path does not exist
-    if not os.path.exists(f'{feature_path}/{params['dataset']}_test_X.pt'):
+    if not os.path.exists(f"{feature_path}/{params['dataset']}_test_X.pt"):
         full_X = []
         full_Y = []
         for i in tqdm(range(n_test_files)):
-            X = torch.load(tmp_path + f'{params['dataset']}_test_X_part{i}.pt')
-            Y = torch.load(tmp_path + f'{params['dataset']}_test_Y_part{i}.pt')
+            X = torch.load(tmp_path + f"{params['dataset']}_test_X_part{i}.pt")
+            Y = torch.load(tmp_path + f"{params['dataset']}_test_Y_part{i}.pt")
             full_X.append(X)
             full_Y.append(Y)
         full_X = torch.cat(full_X)
         full_Y = torch.cat(full_Y)
 
-        torch.save(full_X, feature_path + f'{params['dataset']}_test_X.pt')
-        torch.save(full_Y, feature_path + f'{params['dataset']}_test_Y.pt')
+        torch.save(full_X, feature_path + f"{params['dataset']}_test_X.pt")
+        torch.save(full_Y, feature_path + f"{params['dataset']}_test_Y.pt")

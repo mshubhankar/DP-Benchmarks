@@ -1,0 +1,9 @@
+# Ignore pycache folder
+__pycache__/
+
+# Ignore data folder
+data/
+.data/
+
+# Ignore results folder
+results/

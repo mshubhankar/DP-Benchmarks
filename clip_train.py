@@ -22,7 +22,7 @@ import utils
 
 class get_feature(Dataset):
     def __init__(self, params, feature_dir, aug=False, mode='train'):
-        self.root_dir = feature_dir + params['baseline']
+        self.root_dir = feature_dir
         self.mode = mode
         if aug:
             self.aug = True
@@ -32,13 +32,13 @@ class get_feature(Dataset):
             self.aug = False
         
         if self.aug:
-            x_train_path = os.path.join(self.root_dir, f'{dataset}_aug_{augk}_train_X.pt')
-            y_train_path = os.path.join(self.root_dir, f'{dataset}_aug_{augk}_train_Y.pt')
+            x_train_path = os.path.join(self.root_dir, f'{params["dataset"]}_aug_{augk}_train_X.pt')
+            y_train_path = os.path.join(self.root_dir, f'{params["dataset"]}_aug_{augk}_train_Y.pt')
         else:
-            x_train_path = os.path.join(self.root_dir, f'{dataset}_train_X.pt')
-            y_train_path = os.path.join(self.root_dir, f'{dataset}_train_Y.pt')
-        x_test_path = os.path.join(self.root_dir, f'{dataset}_test_X.pt')
-        y_test_path = os.path.join(self.root_dir, f'{dataset}_test_Y.pt')
+            x_train_path = os.path.join(self.root_dir, f'{params["dataset"]}_train_X.pt')
+            y_train_path = os.path.join(self.root_dir, f'{params["dataset"]}_train_Y.pt')
+        x_test_path = os.path.join(self.root_dir, f'{params["dataset"]}_test_X.pt')
+        y_test_path = os.path.join(self.root_dir, f'{params["dataset"]}_test_Y.pt')
 
         # make features if not already made
         if not os.path.exists(x_train_path):
@@ -71,7 +71,7 @@ def train_clip(params):
     if not os.path.exists(clip_features):
         os.makedirs(clip_features)
     
-    data_feature_path = clip_features + f'/{params['baseline']}'
+    data_feature_path = clip_features + f'/{params["baseline"]}'
     if not os.path.exists(data_feature_path):
         os.makedirs(data_feature_path)
     
@@ -87,19 +87,20 @@ def train_clip(params):
         avg_acc = 0
         avg_train_acc = 0
 
-    if 'g_14' in params['baseline']:
+    if 'g14' in params['baseline']:
         data_features = 1280
-    elif 'b_16' in params['baseline']:
+    elif 'b16' in params['baseline']:
         data_features = 512
 
 
     avg_auc = []
     avg_train_auc = []
-    params['log_file'].write(f'Minibatch size: {params['minibatch_size']}\nData feature: {data_features}\n\
-                             Output dim: {params['output_dim']}\nClip norm: {params['clip_norm']}\n\
-                             EMA: {params['ema_flag']}\n Norm: {params['norm_flag']}\n')
-    params['log_file'].write(f'Epochs: {params['epochs']} Privacy: {params['privacy']} Epsilon: {params['epsilon']}\
-                              Reps: {params['reps']}\n')
+    
+    params['log_file'].write(f'Minibatch size: {{params["minibatch_size"]}}\nData feature: {{data_features}}\n\
+                                 Output dim: {{params["output_dim"]}}\nClip norm: {{params["clip_norm"]}}\n\
+                                 EMA: {{params["ema_flag"]}}\n Norm: {{params["norm_flag"]}}\n')
+    params['log_file'].write(f'Epochs: {{params["epochs"]}} Privacy: {{params["privacy"]}} Epsilon: {{params["epsilon"]}}\
+                                  Reps: {{params["reps"]}}\n')
 
 
     
@@ -113,7 +114,7 @@ def train_clip(params):
 
 
     for rep in range(params['reps']):
-        print(f'Repetition {rep+1}/{params['reps']}')
+        print(f'Repetition {rep+1}/{params["reps"]}')
 
         train_loader = DataLoader(train_set, batch_size=params['minibatch_size'], shuffle=True)
         test_loader = DataLoader(test_set, batch_size=len(test_set), shuffle=False)
@@ -124,16 +125,16 @@ def train_clip(params):
         else:
             full_train_loader = DataLoader(train_set, batch_size=len(train_set), shuffle=False)
         
-        if model == 'lr':
+        if params['model'] == 'lr':
             # train the logistic regression model using torch
             model = LogisticRegresion(data_features, params['output_dim'], norm=params['norm_flag'], norm_stats=norm_stats,\
                                         num_groups=params['group_norm_groups'])
 
-        if model == 'tlnn':
+        if params['model'] == 'tlnn':
             # train the logistic regression model using torch
             model = TwoLayer(data_features, params['output_dim'], norm=params['norm_flag'], norm_stats=norm_stats)
             
-        if model == 'cnn':
+        if params['model'] == 'cnn':
             model = CNN(input_norm=params['norm_flag'], weight_standardization=False)
         # torch.nn.init.zeros_(model.linear.weight)
         
@@ -159,7 +160,7 @@ def train_clip(params):
                 optimizer=optimizer,
                 data_loader=train_loader,
                 epochs=params['epochs'],
-                target_epsilon=epsilon,
+                target_epsilon=params['epsilon'],
                 target_delta=target_delta,
                 max_grad_norm=params['clip_norm'],
                 grad_sample_mode=hook_style,
@@ -216,12 +217,12 @@ def train_clip(params):
                     ema.update()
                 
                 train_loss += loss.item()
-            print(f'Epoch {epoch}/{params['epochs']}: Train loss: {train_loss/len(train_set)}', end=' ')
+            print(f"Epoch {epoch}/{params['epochs']}: Train loss: {train_loss/len(train_set)}", end=' ')
             del X, Y
             del train_pred, train_true
 
         if params['privacy']:
-            epsilon = privacy_engine.get_epsilon(params['target_delta'])
+            epsilon = privacy_engine.get_epsilon(target_delta)
             print(f'Epsilon after epoch {epoch}: {epsilon}')
 
 
@@ -258,11 +259,9 @@ def train_clip(params):
                 X, Y = X.to(params['device']), Y.to(params['device'])
                 model = model.to(params['device'])
                 
-                if ema_flag:
+                if params['ema_flag']:
                     with ema.average_parameters():
                         output = model(X)
-                # if aug:
-                #     output = fmodel(params, X)
                 else:
                     output = model(X)
                 
@@ -281,22 +280,19 @@ def train_clip(params):
             params['log_file'].write(f'Rep {rep}: Test ACC- {acc} Test AUC- {auc}\n')
             del test_pred, test_true
         
-        avg_acc /= params['reps']
-        avg_auc = sum(avg_auc) / len(avg_auc)
-        std_dev_auc = torch.tensor(avg_auc).std()
-        params['log_file'].write(f'Average Test ACC- {avg_acc} AUC- {avg_auc}\n')
-        print(f'Average Test ACC- {avg_acc} AUC- {avg_auc}\n')
+    avg_acc /= params['reps']
+    std_dev_auc = torch.tensor(avg_auc).std()
+    params['log_file'].write(f'Average Test ACC- {sum(avg_auc) / len(avg_auc)} AUC- {avg_auc}\n')
+    print(f'Average Test ACC- {avg_acc} AUC- {sum(avg_auc) / len(avg_auc)}\n')
 
-        avg_train_acc /= params['reps']
-        avg_train_auc = sum(avg_train_auc) / len(avg_train_auc)
-        std_train_auc = torch.tensor(avg_train_auc).std()
-        params['log_file'].write(f'Average Train ACC- {avg_train_acc} AUC- {avg_train_auc}\n')
-        print(f'Average Train ACC- {avg_train_acc} AUC- {avg_train_auc}\n')
-        if params['privacy']:
-            params['log_file'].write(f'Noise multiplier: {optimizer.noise_multiplier}\n\n')
+    avg_train_acc /= params['reps']
+    std_train_auc = torch.tensor(avg_train_auc).std()
+    params['log_file'].write(f'Average Train ACC- {sum(avg_train_auc) / len(avg_train_auc)} AUC- {avg_train_auc}\n')
+    print(f'Average Train ACC- {avg_train_acc} AUC- {sum(avg_train_auc) / len(avg_train_auc)}\n')
+    if params['privacy']:
+        params['log_file'].write(f'Noise multiplier: {optimizer.noise_multiplier}\n\n')
 
-        params['result_file_excel'].write(f'{params['dataset']},{params['epochs']},{params['privacy']},{epsilon},{target_delta},{params['clip_norm']},Adam,0.001,False,{params['ema_flag']},\
-                                {params['minibatch_size']},{params['norm_flag']},{avg_train_auc},{std_train_auc},{avg_auc},{avg_acc}, {std_dev_auc}\n')
+    params['result_file_csv'].write(f"{params['dataset']},{params['epochs']},{params['privacy']},{epsilon},{target_delta},{params['clip_norm']},Adam,0.001,False,{params['ema_flag']},{params['minibatch_size']},{params['norm_flag']},{sum(avg_train_auc) / len(avg_train_auc)},{std_train_auc},{sum(avg_auc) / len(avg_auc)},{avg_acc}, {std_dev_auc}\n")
 
-    params['result_file'].close()
-    params['result_file_excel'].close()
+    params['log_file'].close()
+    params['result_file_csv'].close()
