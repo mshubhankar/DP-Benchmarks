@@ -13,6 +13,7 @@ params = {
     'aug_multiplicity' : False, # if augmentation multiplicity turned on
     'n_augs' : 8, # number of augmentations
     'baseline' : 'clip_g14', # baseline model. Options: clip_g14, clip_g16, wrn, scatternet
+    'mode' : 'full', #wrn training mode. Options: 'full', 'final', 'scratch'
     'model' : 'lr', # model. Options: lr, cnn, tlnn
     'epochs' : 20, # number of epochs
     'privacy' : True, # if privacy turned on
@@ -30,4 +31,5 @@ params = {
 
 variable_parameters_dict = {
     'dataset' : ['cifar10', 'chexpert', 'eyepacs'],
+    'mode' : ['full', 'final', 'scratch'],
 }
