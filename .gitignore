@@ -7,3 +7,6 @@ data/
 
 # Ignore results folder
 results/
+
+#Ignore pretrained weights for now
+**.pth
