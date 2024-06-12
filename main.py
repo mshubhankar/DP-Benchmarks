@@ -9,11 +9,11 @@ from data import get_data
 from numpy.linalg import norm
 from torch.func import grad, grad_and_value, vmap
 from opacus.grad_sample import GradSampleModule
-# from models import LogisticRegresion, CNN, TwoLayer
+from models import LogisticRegresion, CNN, TwoLayer
 import config   
 import time
 from sklearn.model_selection import ParameterGrid
-# import clip_train
+import clip_train
 import wrn_train
 
 params = config.params
@@ -36,9 +36,9 @@ for conf in variables:
         os.makedirs(result_dir)
     time_stamp_now = time.strftime("%Y%m%d-%H%M%S")
 
-    result_file_excel = open(f'{result_dir}/{time_stamp_now}_{params["dataset"]}_{params["n_augs"]}_{params["model"]}_epochs{params["epochs"]}_privacy{params["privacy"]}_reps{params["reps"]}_ema{params["ema_flag"]}_norm{params["norm_flag"]}_{params["group_norm_groups"]}_batchsize{params["minibatch_size"]}_excel.csv', 'w')
+    result_file_excel = open(f'{result_dir}/{time_stamp_now}_{params["baseline"]}_{params["dataset"]}_{params["n_augs"]}_{params["model"]}_epochs{params["epochs"]}_privacy{params["privacy"]}_reps{params["reps"]}_ema{params["ema_flag"]}_norm{params["norm_flag"]}_{params["group_norm_groups"]}_batchsize{params["minibatch_size"]}_excel.csv', 'w')
 
-    log_file = open(f'{result_dir}/{time_stamp_now}_{params["dataset"]}_{params["n_augs"]}_{params["model"]}_epochs{params["epochs"]}_privacy{params["privacy"]}_reps{params["reps"]}_ema{params["ema_flag"]}_norm{params["norm_flag"]}{params["group_norm_groups"]}_batchsize{params["minibatch_size"]}_excel.txt', 'w')
+    log_file = open(f'{result_dir}/{time_stamp_now}_{params["baseline"]}_{params["dataset"]}_{params["n_augs"]}_{params["model"]}_epochs{params["epochs"]}_privacy{params["privacy"]}_reps{params["reps"]}_ema{params["ema_flag"]}_norm{params["norm_flag"]}{params["group_norm_groups"]}_batchsize{params["minibatch_size"]}_excel.txt', 'w')
 
     params['result_file_csv'] = result_file_excel
     params['log_file'] = log_file
@@ -49,4 +49,8 @@ for conf in variables:
         clip_train.train_clip(params)
 
     elif 'wrn' in params['baseline']:
-        wrn_train.wrn_train(params)
+        for i in range(params["reps"]):
+            if params["privacy"]:
+                wrn_train.wrn_train(params)
+            else:
+                wrn_nonprivate.wrn_train(params)
