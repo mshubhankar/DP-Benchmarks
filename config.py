@@ -16,7 +16,7 @@ params = {
     'baseline' : 'wrn', # baseline model. Options: clip_g14, clip_g16, wrn, scatternet
     'mode' : 'full', #wrn training mode. Options: 'full', 'final', 'scratch'
     'model' : 'lr', # model. Options: lr, cnn, tlnn
-    'epochs' : 3, # number of epochs
+    'epochs' : 1, # number of epochs
     'lr' : 1e-3,
     'privacy' : True, # if privacy turned on
     'epsilon' : 1.0, # epsilon for privacy

@@ -11,7 +11,6 @@ import math
 import config
 
 from sklearn import metrics
-# from sklearn.metrics import roc_auc_score
 from torchmetrics.functional.classification import multilabel_accuracy
 
 import warnings
@@ -102,15 +101,6 @@ model, optimizer, train_loader = privacy_engine.make_private_with_epsilon(
 import numpy as np
 from opacus.utils.batch_memory_manager import BatchMemoryManager
 
-def get_auc(pred, true, multi_label=False):
-    if multi_label:
-        auc = metrics.roc_auc_score(true.detach().cpu().numpy(), pred.detach().cpu().numpy(), average='weighted', multi_class='ovr')
-        
-    else:
-        auc = metrics.roc_auc_score(true.detach().cpu().numpy(), pred.detach().cpu().numpy(), average='weighted', multi_class='ovr')
-   
-    return auc
-
 def accuracy(preds, labels):
     return (preds == labels).mean()
 
@@ -131,10 +121,7 @@ def eye_train(model, train_loader, optimizer, epoch, device):
         optimizer=optimizer
     ) as memory_safe_data_loader:
 
-        for i, (images, target) in enumerate(memory_safe_data_loader):   
-
-            if i>40:
-                break
+        for i, (images, target) in enumerate(memory_safe_data_loader):  
 
             optimizer.zero_grad()
             images = images.to(device)
@@ -159,7 +146,7 @@ def eye_train(model, train_loader, optimizer, epoch, device):
             loss.backward()
             optimizer.step()
 
-            if (i+1) % 10 == 0:
+            if (i+1) % 200 == 0:
                 epsilon = privacy_engine.get_epsilon(DELTA)
                 print(
                     f"\tTrain Epoch: {epoch} \t"
@@ -178,7 +165,7 @@ def eye_train(model, train_loader, optimizer, epoch, device):
 
     print("LOOPS: ", i, " AUC: ", auc)
 
-def chex_train(model, train_loader, optimizer, EPOCHS, device):
+def chex_train(model, train_loader, optimizer, epoch, device):
     print("In chex_train")
 
     device = next(model.parameters()).device
@@ -265,6 +252,7 @@ def test(model, test_loader, device):
 
     test_pred = []
     test_true = []
+    acc = 0
 
     with torch.no_grad():
         for images, target in test_loader:
@@ -277,12 +265,15 @@ def test(model, test_loader, device):
             loss = criterion(output, target)
             preds = np.argmax(output.detach().cpu().numpy(), axis=1)
             labels = target.detach().cpu().numpy()
-            acc = accuracy(preds, labels)
+            
+            if params['dataset'] == 'eyepacs_complete':
+                acc = accuracy(preds, labels)
 
             test_pred.append(test_probs.detach().cpu().numpy())
             test_true.append(target.detach().cpu().numpy())
 
             losses.append(loss.item())
+
             top1_acc.append(acc)
 
 
