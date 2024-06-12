@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import opacus
 from opacus.validators import ModuleValidator
 from data import get_data
-from wrn_model import WideResNet
+from _models.wrn_model import WideResNet
 import math
 import config
 
