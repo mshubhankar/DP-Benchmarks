@@ -26,6 +26,8 @@ Datasets can be obtained from the following links:
 1. [CheXpert](https://stanfordmlgroup.github.io/competitions/chexpert/)
 2. [EyePACS](https://paperswithcode.com/dataset/kaggle-eyepacs)
 
+The weights for the WRN 28-10 pretrained on ImageNet-1k can be found here: [WRN 28-10](https://drive.google.com/file/d/15k4ET2WM35pDWha1TWPfqkNB-_foYaV-/view?usp=sharing)
+
 
 How to run
 ===
