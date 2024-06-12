@@ -13,6 +13,9 @@ import config
 
 from sklearn import metrics
 
+import warnings
+warnings.filterwarnings("ignore") 
+
 params = config.params
 
 MAX_GRAD_NORM = params['clip_norm']
@@ -64,8 +67,23 @@ else:
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = model.to(device)            
 
+class CrossEntropyLoss(torch.nn.Module):
+    def __init__(self):
+        super(CrossEntropyLoss, self).__init__()
+        self.criterion = F.binary_cross_entropy_with_logits  # with sigmoid
+
+    def forward(self, y_pred, y_true, reduction='mean'):
+        if len(y_pred.shape) == 1:
+            y_pred = y_pred.reshape(-1, 1)
+        if len(y_true.shape) == 1:
+            y_true = y_true.reshape(-1, 1)
+        return self.criterion(y_pred, y_true, reduction=reduction)
+
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.module.parameters(), lr=LR)
+
+if param['dataset'] == 'chexpert':
+    criterion = CrossEntropyLoss()
 
 from opacus import PrivacyEngine
 privacy_engine = PrivacyEngine(accountant='prv')
@@ -95,7 +113,7 @@ def get_auc(pred, true, multi_label=False):
 def accuracy(preds, labels):
     return (preds == labels).mean()
 
-def train(model, train_loader, optimizer, epoch, device):
+def eye_train(model, train_loader, optimizer, epoch, device):
     model.train()
     criterion = nn.CrossEntropyLoss()
 
@@ -111,7 +129,6 @@ def train(model, train_loader, optimizer, epoch, device):
         optimizer=optimizer
     ) as memory_safe_data_loader:
 
-        import pdb; pdb.set_trace()
         for i, (images, target) in enumerate(memory_safe_data_loader):   
 
             optimizer.zero_grad()
@@ -156,9 +173,85 @@ def train(model, train_loader, optimizer, epoch, device):
 
     print("LOOPS: ", i, " AUC: ", auc)
 
+def eye_train(model, train_loader, optimizer, ema, max_physical_batch_size=128):
+    device = next(model.parameters()).device
+    model.train()
+    train_loss = 0
+    num_examples = 0
+    losses = []
+
+    criterion = CrossEntropyLoss()
+    train_pred = []
+    train_true = []
+
+    train_pred_cpu = []
+    train_true_cpu = []
+
+    print(f'Train Loader: {len(train_loader)}, {train_loader.batch_size}')
+
+
+    with BatchMemoryManager(
+            data_loader=train_loader,
+            max_physical_batch_size=MAX_PHYSICAL_BATCH_SIZE,
+            optimizer=optimizer
+    ) as memory_safe_data_loader:
+        for i, (data, target) in enumerate(memory_safe_data_loader):
+
+            optimizer.zero_grad()
+
+            data, target = data.to(device), target.to(device)
+
+            output = model(data)
+            
+            loss = criterion(output, target)
+            losses.append(loss.item())
+            loss.backward()
+
+            optimizer.step()
+
+
+            train_loss += criterion(output, target, reduction='sum').item()
+            num_examples += len(data)
+
+            # calculate multi-label accuracy
+            train_pred.append(output)
+            train_true.append(target)
+
+            if (i+1) % 200 == 0:
+                epsilon = privacy_engine.get_epsilon(DELTA)
+                print(
+                    f"\tTrain Epoch: {epoch} \t"
+                    f"Loss: {np.mean(losses):.6f} "
+                    f"(ε = {epsilon:.2f}, δ = {DELTA})"
+                )
+
+            # Append to calculate AUC
+            train_pred_cpu.append(output.cpu().detach().numpy())
+            train_true_cpu.append(target.cpu().detach().numpy())
+
+
+    train_loss /= num_examples
+    
+    train_pred = torch.cat(train_pred)
+    train_true = torch.cat(train_true)
+    multi_label_acc = multilabel_accuracy(train_pred, train_true, num_labels=train_true.size(dim=1), average=None).cpu()
+
+    train_pred_cpu = np.concatenate(train_pred_cpu)
+    train_true_cpu = np.concatenate(train_true_cpu)
+    val_auc_mean = roc_auc_score(train_true_cpu, train_pred_cpu, average='weighted', multi_class='ovr')
+
+    print("LOOPS: ", i ," ", f'Train set: Average loss: {train_loss:.4f}', f'Accuracy: {multi_label_acc}', f'AUC: {val_auc_mean:.4f}')
+
+    return train_loss, multi_label_acc, val_auc_mean 
+
+
 def test(model, test_loader, device):
     model.eval()
     criterion = nn.CrossEntropyLoss()
+    
+    if param['dataset'] == 'chexpert':
+        criterion = CrossEntropyLoss()
+
     losses = []
     top1_acc = []
     auc_list = []
@@ -192,6 +285,18 @@ def test(model, test_loader, device):
     test_pred = np.concatenate(test_pred)
     val_auc_mean = metrics.roc_auc_score(test_true, test_pred, average='weighted', multi_class='ovr')
 
+    if param['dataset'] == 'chexpert':
+        test_acc = multilabel_accuracy(torch.from_numpy(test_pred), torch.from_numpy(test_true), num_labels=torch.from_numpy(test_true).size(dim=1), average=None).cpu()
+        print(
+            f"\tTest set:   "
+            f"Acc:  "
+            f"{test_acc}"
+            f"AUC: {val_auc_mean * 100:.6f} "
+        )
+
+        return test_acc
+
+
     print(
         f"\tTest set:"
         f"Loss: {np.mean(losses):.6f} "
@@ -204,9 +309,15 @@ def test(model, test_loader, device):
 
 def wrn_train(params, model=model, train_loader=train_loader, test_loader=test_loader, optimizer=optimizer, device=device):
     EPOCHS = params['epochs']
+    import pdb; pdb.set_trace()
+
+
     print("Training...")
     for epoch in range(EPOCHS):
-        train(model, train_loader, optimizer, epoch + 1, device)
+        if param['dataset'] == 'chexpert':
+            chex_train(model, train_loader, optimizer, epoch + 1, device)
+        elif param['dataset'] == 'eyepacs_complete':
+            eye_train(model, train_loader, optimizer, epoch + 1, device)
 
     print("End of training. Testing...")
-    top1_acc = test(model, test_loader, device)
+    test(model, test_loader, device)
