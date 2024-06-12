@@ -23,7 +23,7 @@ import torchvision.transforms as transforms
 from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import Subset
 
-from model import WideResNet
+from _models.wrn_model import WideResNet
 
 import os
 
