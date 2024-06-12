@@ -11,6 +11,8 @@ import math
 import config
 
 from sklearn import metrics
+# from sklearn.metrics import roc_auc_score
+from torchmetrics.functional.classification import multilabel_accuracy
 
 import warnings
 warnings.filterwarnings("ignore") 
@@ -175,7 +177,7 @@ def eye_train(model, train_loader, optimizer, epoch, device):
 
     print("LOOPS: ", i, " AUC: ", auc)
 
-def eye_train(model, train_loader, optimizer, ema, max_physical_batch_size=128):
+def chex_train(model, train_loader, optimizer, EPOCHS, device):
     device = next(model.parameters()).device
     model.train()
     train_loss = 0
@@ -194,7 +196,7 @@ def eye_train(model, train_loader, optimizer, ema, max_physical_batch_size=128):
 
     with BatchMemoryManager(
             data_loader=train_loader,
-            max_physical_batch_size=MAX_PHYSICAL_BATCH_SIZE,
+            max_physical_batch_size=params['max_physical_batch_size'],
             optimizer=optimizer
     ) as memory_safe_data_loader:
         for i, (data, target) in enumerate(memory_safe_data_loader):
@@ -240,7 +242,7 @@ def eye_train(model, train_loader, optimizer, ema, max_physical_batch_size=128):
 
     train_pred_cpu = np.concatenate(train_pred_cpu)
     train_true_cpu = np.concatenate(train_true_cpu)
-    val_auc_mean = roc_auc_score(train_true_cpu, train_pred_cpu, average='weighted', multi_class='ovr')
+    val_auc_mean = metrics.roc_auc_score(train_true_cpu, train_pred_cpu, average='weighted', multi_class='ovr')
 
     print("LOOPS: ", i ," ", f'Train set: Average loss: {train_loss:.4f}', f'Accuracy: {multi_label_acc}', f'AUC: {val_auc_mean:.4f}')
 
