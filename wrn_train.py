@@ -1,9 +1,8 @@
-import argparse
-import os
-
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
 
 import opacus
 from data import get_data
@@ -82,7 +81,7 @@ class CrossEntropyLoss(torch.nn.Module):
 criterion = nn.CrossEntropyLoss()
 optimizer = torch.optim.Adam(model.module.parameters(), lr=LR)
 
-if param['dataset'] == 'chexpert':
+if params['dataset'] == 'chexpert':
     criterion = CrossEntropyLoss()
 
 from opacus import PrivacyEngine
@@ -131,6 +130,9 @@ def eye_train(model, train_loader, optimizer, epoch, device):
 
         for i, (images, target) in enumerate(memory_safe_data_loader):   
 
+            if i>40:
+                break
+
             optimizer.zero_grad()
             images = images.to(device)
             target = target.to(device)
@@ -154,7 +156,7 @@ def eye_train(model, train_loader, optimizer, epoch, device):
             loss.backward()
             optimizer.step()
 
-            if (i+1) % 200 == 0:
+            if (i+1) % 10 == 0:
                 epsilon = privacy_engine.get_epsilon(DELTA)
                 print(
                     f"\tTrain Epoch: {epoch} \t"
@@ -249,7 +251,7 @@ def test(model, test_loader, device):
     model.eval()
     criterion = nn.CrossEntropyLoss()
     
-    if param['dataset'] == 'chexpert':
+    if params['dataset'] == 'chexpert':
         criterion = CrossEntropyLoss()
 
     losses = []
@@ -285,7 +287,7 @@ def test(model, test_loader, device):
     test_pred = np.concatenate(test_pred)
     val_auc_mean = metrics.roc_auc_score(test_true, test_pred, average='weighted', multi_class='ovr')
 
-    if param['dataset'] == 'chexpert':
+    if params['dataset'] == 'chexpert':
         test_acc = multilabel_accuracy(torch.from_numpy(test_pred), torch.from_numpy(test_true), num_labels=torch.from_numpy(test_true).size(dim=1), average=None).cpu()
         print(
             f"\tTest set:   "
@@ -309,14 +311,14 @@ def test(model, test_loader, device):
 
 def wrn_train(params, model=model, train_loader=train_loader, test_loader=test_loader, optimizer=optimizer, device=device):
     EPOCHS = params['epochs']
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
 
 
     print("Training...")
     for epoch in range(EPOCHS):
-        if param['dataset'] == 'chexpert':
+        if params['dataset'] == 'chexpert':
             chex_train(model, train_loader, optimizer, epoch + 1, device)
-        elif param['dataset'] == 'eyepacs_complete':
+        elif params['dataset'] == 'eyepacs_complete':
             eye_train(model, train_loader, optimizer, epoch + 1, device)
 
     print("End of training. Testing...")
