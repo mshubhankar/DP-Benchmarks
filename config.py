@@ -4,16 +4,15 @@ RESULTS_DIR='results'
 DATA_DIR='data'
 
 use_cuda = torch.cuda.is_available()
-# assert use_cuda
 device = torch.device("cuda" if use_cuda else "cpu")
 
 params = {
-    'dataset' : 'chexpert',  # dataset name. Options: cifar10, chexpert, eyepacs_complete
+    'dataset' : 'eyepacs',  # dataset name. Options: cifar10, chexpert, eyepacs
     'minibatch_size' : 64, # mini batch size for dpsgd
     'max_physical_batch_size': 16,
     'aug_multiplicity' : False, # if augmentation multiplicity turned on
     'n_augs' : 8, # number of augmentations
-    'baseline' : 'wrn', # baseline model. Options: clip_g14, clip_g16, wrn, scatternet
+    'baseline' : 'wrn_lin', # baseline model. Options: clip_g14, clip_g16, wrn_full, wrn_lin, wrn_scr, scatternet
     'mode' : 'full', #wrn training mode. Options: 'full', 'final', 'scratch'
     'model' : 'lr', # model. Options: lr, cnn, tlnn
     'epochs' : 1, # number of epochs
@@ -30,8 +29,6 @@ params = {
 }
     
 
-
 variable_parameters_dict = {
-    'dataset' : ['cifar10', 'chexpert', 'eyepacs_complete'],
-    'mode' : ['full', 'final', 'scratch'],
+    'dataset' : ['eyepacs', 'chexpert', 'cifar10'],
 }
