@@ -4,20 +4,17 @@ RESULTS_DIR='results'
 DATA_DIR='data'
 
 use_cuda = torch.cuda.is_available()
-# assert use_cuda
 device = torch.device("cuda" if use_cuda else "cpu")
 
 params = {
-    # use tensors for when you are directly working with SN tensors
-    'dataset' : 'eyepacs_complete_tensors',  # dataset name. Options: cifar10, chexpert, eyepacs_complete, cifar10_tensors, chexpert_tensors, eyepacs_complete_tensors
+    'dataset' : 'eyepacs',  # dataset name. Options: cifar10, chexpert, eyepacs
     'minibatch_size' : 64, # mini batch size for dpsgd
     'max_physical_batch_size': 16,
     'aug_multiplicity' : False, # if augmentation multiplicity turned on
     'n_augs' : 8, # number of augmentations
-    'baseline' : 'scatternet', # baseline model. Options: clip_g14, clip_g16, wrn, scatternet
-    'mode' : 'full', #wrn training mode. Options: 'full', 'final', 'scratch'
-    'model' : 'cnn', # model. Options: lr, cnn, tlnn
-    'epochs' : 20, # number of epochs
+    'baseline' : 'wrn_lin', # baseline model. Options: clip_g14, clip_g16, wrn_full, wrn_lin, wrn_scr, scatternet
+    'model' : 'lr', # model. Options: lr, cnn, tlnn
+    'epochs' : 1, # number of epochs
     'lr' : 1e-3,
     'optim': 'Adam', # optimizer. Options: Adam, SGD
     'privacy' : True, # if privacy turned on
@@ -35,8 +32,6 @@ params = {
 }
     
 
-
 variable_parameters_dict = {
-    'dataset' : ['cifar10', 'chexpert', 'eyepacs_complete'],
-    'mode' : ['full', 'final', 'scratch'],
+    'dataset' : ['eyepacs', 'chexpert', 'cifar10'],
 }

@@ -8,5 +8,8 @@ data/
 # Ignore results folder
 results/
 
+# Ignore opacus folder
+opacus/
+
 #Ignore pretrained weights for now
 **.pth
