@@ -8,7 +8,7 @@ use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 
 params = {
-    'dataset' : 'eyepacs_complete',  # dataset name. Options: cifar10, chexpert, eyepacs_complete
+    'dataset' : 'chexpert',  # dataset name. Options: cifar10, chexpert, eyepacs_complete
     'minibatch_size' : 64, # mini batch size for dpsgd
     'max_physical_batch_size': 16,
     'aug_multiplicity' : False, # if augmentation multiplicity turned on
@@ -16,7 +16,7 @@ params = {
     'baseline' : 'wrn', # baseline model. Options: clip_g14, clip_g16, wrn, scatternet
     'mode' : 'full', #wrn training mode. Options: 'full', 'final', 'scratch'
     'model' : 'lr', # model. Options: lr, cnn, tlnn
-    'epochs' : 20, # number of epochs
+    'epochs' : 3, # number of epochs
     'lr' : 1e-3,
     'privacy' : True, # if privacy turned on
     'epsilon' : 1.0, # epsilon for privacy

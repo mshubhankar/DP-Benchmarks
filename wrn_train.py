@@ -115,6 +115,7 @@ def accuracy(preds, labels):
     return (preds == labels).mean()
 
 def eye_train(model, train_loader, optimizer, epoch, device):
+    print("In eye_train")
     model.train()
     criterion = nn.CrossEntropyLoss()
 
@@ -178,6 +179,8 @@ def eye_train(model, train_loader, optimizer, epoch, device):
     print("LOOPS: ", i, " AUC: ", auc)
 
 def chex_train(model, train_loader, optimizer, EPOCHS, device):
+    print("In chex_train")
+
     device = next(model.parameters()).device
     model.train()
     train_loss = 0
