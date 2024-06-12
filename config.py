@@ -12,7 +12,7 @@ params = {
     'max_physical_batch_size': 16,
     'aug_multiplicity' : False, # if augmentation multiplicity turned on
     'n_augs' : 8, # number of augmentations
-    'baseline' : 'wrn_full', # baseline model. Options: clip_g14, clip_g16, wrn_full, wrn_lin, wrn_scr, scatternet
+    'baseline' : 'wrn_scr', # baseline model. Options: clip_g14, clip_g16, wrn_full, wrn_lin, wrn_scr, scatternet
     'model' : 'lr', # model. Options: lr, cnn, tlnn
     'epochs' : 1, # number of epochs
     'lr' : 1e-3,
