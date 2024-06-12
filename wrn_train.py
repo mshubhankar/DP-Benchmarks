@@ -36,7 +36,7 @@ from opacus.utils.batch_memory_manager import BatchMemoryManager
 def accuracy(preds, labels):
     return (preds == labels).mean()
 
-def eye_train(model, train_loader, optimizer, epoch, device, mpbs, privacy_engine, DELTA = 1e-05):
+def eye_train(model, train_loader, optimizer, epoch, device, privacy_engine, params, DELTA = 1e-05):
     print("In eye_train")
     model.train()
     criterion = nn.CrossEntropyLoss()
@@ -49,7 +49,7 @@ def eye_train(model, train_loader, optimizer, epoch, device, mpbs, privacy_engin
 
     with BatchMemoryManager(
         data_loader=train_loader, 
-        max_physical_batch_size=mpbs, 
+        max_physical_batch_size=params['max_physical_batch_size'], 
         optimizer=optimizer
     ) as memory_safe_data_loader:
 
@@ -98,8 +98,10 @@ def eye_train(model, train_loader, optimizer, epoch, device, mpbs, privacy_engin
     auc = metrics.roc_auc_score(train_true_cpu, train_pred_cpu, average='weighted', multi_class='ovr')
 
     print("LOOPS: ", i, " AUC: ", auc)
+    params['log_file'].write(f'Epoch: {epoch} Train set: Average loss: {np.mean(losses):.6f}' f'Accuracy: {np.mean(top1_acc) * 100:.6f}' f'AUC: {auc:.4f}' f"(ε = {epsilon:.2f}, δ = {DELTA})")
 
-def chex_train(model, train_loader, optimizer, epoch, device, mpbs, privacy_engine, DELTA=1e-06):
+
+def chex_train(model, train_loader, optimizer, epoch, device, privacy_engine, params, DELTA=1e-06):
     print("In chex_train")
 
     device = next(model.parameters()).device
@@ -120,10 +122,13 @@ def chex_train(model, train_loader, optimizer, epoch, device, mpbs, privacy_engi
 
     with BatchMemoryManager(
             data_loader=train_loader,
-            max_physical_batch_size=mpbs,
+            max_physical_batch_size=params['max_physical_batch_size'],
             optimizer=optimizer
     ) as memory_safe_data_loader:
         for i, (data, target) in enumerate(memory_safe_data_loader):
+
+            if i>20:
+                break
 
             optimizer.zero_grad()
 
@@ -145,7 +150,7 @@ def chex_train(model, train_loader, optimizer, epoch, device, mpbs, privacy_engi
             train_pred.append(output)
             train_true.append(target)
 
-            if (i+1) % 200 == 0:
+            if (i+1) % 5 == 0:
                 epsilon = privacy_engine.get_epsilon(DELTA)
                 print(
                     f"\tTrain Epoch: {epoch} \t"
@@ -169,10 +174,11 @@ def chex_train(model, train_loader, optimizer, epoch, device, mpbs, privacy_engi
     val_auc_mean = metrics.roc_auc_score(train_true_cpu, train_pred_cpu, average='weighted', multi_class='ovr')
 
     print("LOOPS: ", i ," ", f'Train set: Average loss: {train_loss:.4f}', f'Accuracy: {multi_label_acc}', f'AUC: {val_auc_mean:.4f}')
+    params['log_file'].write(f'Epoch: {epoch} Train set: Average loss: {train_loss:.4f}' f'Accuracy: {multi_label_acc}' f'AUC: {val_auc_mean:.4f}')
 
     return train_loss, multi_label_acc, val_auc_mean 
 
-def test(model, test_loader, device, dataset):
+def test(model, test_loader, device, dataset, params):
     model.eval()
     criterion = nn.CrossEntropyLoss()
     
@@ -225,6 +231,12 @@ def test(model, test_loader, device, dataset):
             f"AUC: {val_auc_mean * 100:.6f} "
         )
 
+        params['log_file'].write(            
+            f"\tTest set:   "
+            f"Acc:  "
+            f"{test_acc}"
+            f"AUC: {val_auc_mean * 100:.6f} ")
+
         return test_acc
 
 
@@ -235,10 +247,25 @@ def test(model, test_loader, device, dataset):
         f"AUC: {val_auc_mean * 100:.6f} "
     )
 
+    params['log_file'].write(    
+        f"\tTest set:"
+        f"Loss: {np.mean(losses):.6f} "
+        f"Acc: {top1_avg * 100:.6f} "
+        f"AUC: {val_auc_mean * 100:.6f} "
+    )        
+
+    
+
     return np.mean(top1_acc)
 
 
 def wrn_train(params):
+
+    params['log_file'].write(f'Epochs: {{params["epochs"]}} Privacy: {{params["privacy"]}} Epsilon: {{params["epsilon"]}}\
+                                  Reps: {{params["reps"]}}\n')
+    params['log_file'].write(f'Minibatch size: {{params["minibatch_size"]}}\n\
+                                 Output dim: {{params["output_dim"]}}\nMax grad norm: {{params["clip_norm"]}}\n')
+
 
     MAX_GRAD_NORM = params['clip_norm']
 
@@ -291,6 +318,7 @@ def wrn_train(params):
     else:
         print("The following errors were found in the model:")
         print(errors)
+        return
 
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -318,9 +346,12 @@ def wrn_train(params):
     print("Training...")
     for epoch in range(EPOCHS):
         if params['dataset'] == 'chexpert':
-            chex_train(model, train_loader, optimizer, epoch + 1, device, params['max_physical_batch_size'], privacy_engine, DELTA)
+            chex_train(model, train_loader, optimizer, epoch + 1, device, privacy_engine, params, DELTA)
         elif params['dataset'] == 'eyepacs':
-            eye_train(model, train_loader, optimizer, epoch + 1, device, params['max_physical_batch_size'], privacy_engine, DELTA)
+            eye_train(model, train_loader, optimizer, epoch + 1, device, privacy_engine, params, DELTA)
+
 
     print("End of training. Testing...")
-    test(model, test_loader, device, params['dataset'])
+    test(model, test_loader, device, params['dataset'], params)
+
+    params['log_file'].close()

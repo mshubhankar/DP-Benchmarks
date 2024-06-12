@@ -36,9 +36,9 @@ for conf in variables:
         os.makedirs(result_dir)
     time_stamp_now = time.strftime("%Y%m%d-%H%M%S")
 
-    result_file_excel = open(f'{result_dir}/{time_stamp_now}_{params["dataset"]}_{params["n_augs"]}_{params["model"]}_epochs{params["epochs"]}_privacy{params["privacy"]}_reps{params["reps"]}_ema{params["ema_flag"]}_norm{params["norm_flag"]}_{params["group_norm_groups"]}_batchsize{params["minibatch_size"]}_excel.csv', 'w')
+    result_file_excel = open(f'{result_dir}/{time_stamp_now}_{params["baseline"]}_{params["dataset"]}_{params["n_augs"]}_{params["model"]}_epochs{params["epochs"]}_privacy{params["privacy"]}_reps{params["reps"]}_ema{params["ema_flag"]}_norm{params["norm_flag"]}_{params["group_norm_groups"]}_batchsize{params["minibatch_size"]}_excel.csv', 'w')
 
-    log_file = open(f'{result_dir}/{time_stamp_now}_{params["dataset"]}_{params["n_augs"]}_{params["model"]}_epochs{params["epochs"]}_privacy{params["privacy"]}_reps{params["reps"]}_ema{params["ema_flag"]}_norm{params["norm_flag"]}{params["group_norm_groups"]}_batchsize{params["minibatch_size"]}_excel.txt', 'w')
+    log_file = open(f'{result_dir}/{time_stamp_now}_{params["baseline"]}_{params["dataset"]}_{params["n_augs"]}_{params["model"]}_epochs{params["epochs"]}_privacy{params["privacy"]}_reps{params["reps"]}_ema{params["ema_flag"]}_norm{params["norm_flag"]}{params["group_norm_groups"]}_batchsize{params["minibatch_size"]}_excel.txt', 'w')
 
     params['result_file_csv'] = result_file_excel
     params['log_file'] = log_file
