@@ -7,7 +7,7 @@ import torch.nn as nn
 
 import opacus
 from data import get_data
-from model import WideResNet
+from wrn_model import WideResNet
 import math
 import config
 
