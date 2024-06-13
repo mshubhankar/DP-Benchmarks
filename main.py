@@ -15,6 +15,7 @@ import time
 from sklearn.model_selection import ParameterGrid
 import clip_train
 import wrn_train
+import scatternet_train
 
 params = config.params
 if params['dataset'].startswith('chexpert') or params['dataset'].startswith('eyepacs'):
@@ -54,3 +55,5 @@ for conf in variables:
                 wrn_train.wrn_train(params)
             else:
                 wrn_nonprivate.wrn_train(params)
+    elif 'scatternet' in params['baseline']:
+        scatternet_train.train_scatternet(params)
