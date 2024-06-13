@@ -10,6 +10,11 @@ Conda can be also be used to building environment
 Run `conda env create -f=environment.yml
 $ conda activate dpbenchmarks`
 
+For the ScatterNet experiments please use the following:
+`conda env create -f=sn_env.yml
+$ conda activate sn_env`
+
+
 This repository also uses the functional module of Opacus and hence needs opacus to be installed from scratch. 
 This can be done using:
 
