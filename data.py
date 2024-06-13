@@ -405,18 +405,16 @@ def get_data(name, augment=False, **kwargs):
                                 transform=transform)
 
     elif name == "eyepacs_tensors":
-        print("eyepacs_complete_tensors")
-        # train_dir_scatters = f".data/{name}/train/scatters"
-        # train_dir_targets = f".data/{name}/train/targets"
-        # test_dir_scatters = f".data/{name}/test/scatters"
-        # test_dir_targets = f".data/{name}/test/targets"
-
+        train_dir_scatters = f".data/{name}/train/scatters"
+        train_dir_targets = f".data/{name}/train/targets"
+        test_dir_scatters = f".data/{name}/test/scatters"
+        test_dir_targets = f".data/{name}/test/targets"
         train_set = ScatterDataset(
-            x_folder='/u2/s4mokhta/embeddings/eyepacs_complete_tensors/train/scatters',
-            y_folder='/u2/s4mokhta/embeddings/eyepacs_complete_tensors/train/targets')
+            x_folder=train_dir_scatters,
+            y_folder=train_dir_targets)
         test_set = ScatterDataset(
-            x_folder='/u2/s4mokhta/embeddings/eyepacs_complete_tensors/test/scatters',
-            y_folder='/u2/s4mokhta/embeddings/eyepacs_complete_tensors/test/targets')
+            x_folder=test_dir_scatters,
+            y_folder=test_dir_targets)
     
     elif name == "eyepacs_complete_tensors_augmented":
         train_set = ScatterDataset(
@@ -435,16 +433,16 @@ def get_data(name, augment=False, **kwargs):
             y_folder='/share/TheSalon_Benchmarks/embeddings/chexpert224_single/test/targets')
 
     elif name == "chexpert_tensors":
-        # train_dir_scatters = f".data/{name}/train/scatters"
-        # train_dir_targets = f".data/{name}/train/targets"
-        # test_dir_scatters = f".data/{name}/test/scatters"
-        # test_dir_targets = f".data/{name}/test/targets"
+        train_dir_scatters = f".data/{name}/train/scatters"
+        train_dir_targets = f".data/{name}/train/targets"
+        test_dir_scatters = f".data/{name}/test/scatters"
+        test_dir_targets = f".data/{name}/test/targets"
         train_set = ScatterDataset(
-            x_folder='/shared/shared_1/embeddings/chexlocalize/train/scatters',
-            y_folder='/shared/shared_1/embeddings/chexlocalize/train/targets')
+            x_folder=train_dir_scatters,
+            y_folder=train_dir_targets)
         test_set = ScatterDataset(
-            x_folder='/shared/shared_1/embeddings/chexlocalize/test/scatters',
-            y_folder='/shared/shared_1/embeddings/chexlocalize/test/targets')
+            x_folder=test_dir_scatters,
+            y_folder=test_dir_targets)
     
     elif name == "chexpert_tensors_augmented":
         train_set = ScatterDataset(
@@ -744,10 +742,10 @@ def create_scattered_features(loader, scattering, device, aug_multiplicity=False
     scatter_counter = 0
     target_counter = 0
 
-    train_path = f".data/{dataset}/{data_type}/scatters"
-    target_path = f".data/{dataset}/{data_type}/targets"
-    if not os.path.exists(train_path):
-        os.makedirs(train_path)
+    data_path = f".data/{dataset}_tensors/{data_type}/scatters"
+    target_path = f".data/{dataset}_tensors/{data_type}/targets"
+    if not os.path.exists(data_path):
+        os.makedirs(data_path)
     if not os.path.exists(target_path):
         os.makedirs(target_path)
 
