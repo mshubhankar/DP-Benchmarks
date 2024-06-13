@@ -26,8 +26,6 @@ params = {
     'group_norm_groups' : 9, # number of groups for GroupNorm
     'data_norm_sigma' : 8.0, # sigma for DataNorm
     'weight_standardization': False, # if weight standardization turned on
-    'grad_sample_mode': None, # None, 'no_op' for augmentation multiplicity
-    'use_scattering': False, # when not using scatter featurs directly and want to calculate them on the fly
     'device' : device, # device
 }
     
