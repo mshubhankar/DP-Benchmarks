@@ -294,14 +294,13 @@ def private_main(dataset, augment=False, size=None,
 
 def train_scatternet(params):
     reps = params['reps']
-    params['layer'] = params['model']
     model = params['model']
     privacy = params['privacy']
 
     params['grad_sample_mode'] = "no_op" if params['aug_multiplicity'] else None
+    params['layer'] = params['model']
 
     del params['baseline']
-    del params['mode']
     del params['reps']
     del params['model']
 
