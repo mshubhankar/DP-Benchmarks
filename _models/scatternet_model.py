@@ -325,7 +325,6 @@ CNNS = {
     "cifar10": CIFAR10_CNN,
     "chexpert": CheXpert_CNN,
     "eyepacs": EYEPACS_CNN,
-    "eyepacs_complete_tensors": EYEPACS_CNN,
-    "cifar10_tensors": CIFAR10_CNN,
+    "eyepacs_tensors": EYEPACS_CNN,
     "chexpert_tensors": CheXpert_CNN,
 }
