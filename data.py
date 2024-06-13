@@ -1,6 +1,6 @@
 import torch
 from torchvision import datasets, transforms
-# from kymatio.torch import Scattering2D
+from kymatio.torch import Scattering2D
 import os
 import pickle
 import numpy as np
@@ -21,7 +21,6 @@ import cv2
 import torchvision.transforms as tfs
 import pandas as pd
 from torchvision import transforms
-np.random.seed(51)
 
 # import webdataset as wds
 import json
@@ -394,68 +393,38 @@ def get_data(name, augment=False, **kwargs):
         test_set = CheXpert(csv_path=root + 'valid.csv', image_root_path=root, use_upsampling=False, use_frontal=True,
                             image_size=224, mode='valid', class_index=1)
 
-    elif name == "eyepacs_complete":
-        transform = transforms.Compose([transforms.Resize((224, 224)),
-                                        transforms.ToTensor()])
-
-        train_set = EyePACSDataset('/share/TheSalon_Benchmarks/eyepacs_complete/trainLabels.csv',
-                                 '/share/TheSalon_Benchmarks/eyepacs_complete/train',
-                                 transform=transform)
-        test_set = EyePACSDataset('/share/TheSalon_Benchmarks/eyepacs_complete/retinopathy_solution.csv', 
-                                '/share/TheSalon_Benchmarks/eyepacs_complete/test',
-                                transform=transform)
-    
     elif name == "eyepacs":
         transform = transforms.Compose([transforms.Resize((224, 224)),
                                         transforms.ToTensor()])
 
-        dataset = EyePACSDataset('/share/TheSalon_Benchmarks/eyepacs/trainLabels.csv',
-                                 '/share/TheSalon_Benchmarks/eyepacs/eyepacs_preprocess/eyepacs_preprocess',
+        train_set = EyePACSDataset('/shared/shared_1/eyepacs_complete/trainLabels.csv',
+                                 '/shared/shared_1/eyepacs_complete/train',
                                  transform=transform)
-
-        # Divide the dataset into train, test, and validation sets
-        num_train = int(len(dataset) * 0.7)
-        num_test = int(len(dataset) * 0.3)
-
-        print("Random Seed:", np.random.get_state()[1][0])
-        train_indices = np.random.choice(range(len(dataset)), num_train, replace=False)
-        test_indices = list(set(range(len(dataset))) - set(train_indices))
-
-        train_set = Subset(dataset, train_indices)
-        test_set = Subset(dataset, test_indices)
-
-    elif name == "eyepacs_complete_tensors":
-        # url = '/u2/s4mokhta/embeddings/eyepacs_complete/train/train.tar'
-        # train_set = (
-        #     wds.WebDataset(url)
-        #     .rename(image="pt", label="json")
-        #     .shuffle(1000)
-        #     .to_tuple("image", "label")
-        #     .map_tuple(wds.torch_loads, identity)
-        #     ).with_length(35126)
-        # test_set = (
-        #     wds.WebDataset(url)
-        #     .rename(image="pt", label="json")
-        #     .shuffle(1000)
-        #     .to_tuple("image", "label")
-        #     .map_tuple(wds.torch_loads, identity)
-        #     ).with_length(35126)
-        print("eyepacs_complete_tensors")
-        train_set = ScatterDataset(
-            x_folder='/u2/s4mokhta/embeddings/eyepacs_complete/train/scatters',
-            y_folder='/u2/s4mokhta/embeddings/eyepacs_complete/train/targets')
-        test_set = ScatterDataset(
-            x_folder='/u2/s4mokhta/embeddings/eyepacs_complete/test/scatters',
-            y_folder='/u2/s4mokhta/embeddings/eyepacs_complete/test/targets')
+        test_set = EyePACSDataset('/shared/shared_1/eyepacs_complete/retinopathy_solution.csv', 
+                                '/shared/shared_1/eyepacs_complete/test',
+                                transform=transform)
 
     elif name == "eyepacs_tensors":
-        print("eyepacs_51")
+        print("eyepacs_complete_tensors")
+        # train_dir_scatters = f".data/{name}/train/scatters"
+        # train_dir_targets = f".data/{name}/train/targets"
+        # test_dir_scatters = f".data/{name}/test/scatters"
+        # test_dir_targets = f".data/{name}/test/targets"
+
         train_set = ScatterDataset(
-            x_folder='/share/TheSalon_Benchmarks/embeddings/eyepacs_51/train/scatters',
-            y_folder='/share/TheSalon_Benchmarks/embeddings/eyepacs_51/train/targets')
+            x_folder='/u2/s4mokhta/embeddings/eyepacs_complete_tensors/train/scatters',
+            y_folder='/u2/s4mokhta/embeddings/eyepacs_complete_tensors/train/targets')
         test_set = ScatterDataset(
-            x_folder='/share/TheSalon_Benchmarks/embeddings/eyepacs_51/train/scatters',
-            y_folder='/share/TheSalon_Benchmarks/embeddings/eyepacs_51/train/targets')
+            x_folder='/u2/s4mokhta/embeddings/eyepacs_complete_tensors/test/scatters',
+            y_folder='/u2/s4mokhta/embeddings/eyepacs_complete_tensors/test/targets')
+    
+    elif name == "eyepacs_complete_tensors_augmented":
+        train_set = ScatterDataset(
+            x_folder='/u2/s4mokhta/embeddings/eyepacs_complete_tensors_8/train/scatters',
+            y_folder='/u2/s4mokhta/embeddings/eyepacs_complete_tensors_8/train/targets')
+        test_set = ScatterDataset(
+            x_folder='/u2/s4mokhta/embeddings/eyepacs_complete_tensors/test/scatters',
+            y_folder='/u2/s4mokhta/embeddings/eyepacs_complete_tensors/test/targets')
 
     elif name == "chexpert_single_tensors":
         train_set = ScatterDataset(
@@ -466,12 +435,24 @@ def get_data(name, augment=False, **kwargs):
             y_folder='/share/TheSalon_Benchmarks/embeddings/chexpert224_single/test/targets')
 
     elif name == "chexpert_tensors":
+        # train_dir_scatters = f".data/{name}/train/scatters"
+        # train_dir_targets = f".data/{name}/train/targets"
+        # test_dir_scatters = f".data/{name}/test/scatters"
+        # test_dir_targets = f".data/{name}/test/targets"
         train_set = ScatterDataset(
-            x_folder='/share/TheSalon_Benchmarks/embeddings/chexpert224/train/scatters',
-            y_folder='/share/TheSalon_Benchmarks/embeddings/chexpert224/train/targets')
+            x_folder='/shared/shared_1/embeddings/chexlocalize/train/scatters',
+            y_folder='/shared/shared_1/embeddings/chexlocalize/train/targets')
         test_set = ScatterDataset(
-            x_folder='/share/TheSalon_Benchmarks/embeddings/chexpert224/test/scatters',
-            y_folder='/share/TheSalon_Benchmarks/embeddings/chexpert224/test/targets')
+            x_folder='/shared/shared_1/embeddings/chexlocalize/test/scatters',
+            y_folder='/shared/shared_1/embeddings/chexlocalize/test/targets')
+    
+    elif name == "chexpert_tensors_augmented":
+        train_set = ScatterDataset(
+            x_folder='/shared/shared_1/embeddings/chexpert_tensors_augmented_8/train/scatters',
+            y_folder='/shared/shared_1/embeddings/chexpert_tensors_augmented_8/train/targets')
+        test_set = ScatterDataset(
+            x_folder='/shared/shared_1/embeddings/chexlocalize/test/scatters',
+            y_folder='/shared/shared_1/embeddings/chexlocalize/test/targets')
 
     elif name == "mnist_tensors":
         train_set = ScatterDataset(x_folder='/home/s4mokhta/DP-Benchmarks/Handcrafted-DP/embeddings/MNIST/scatters',
@@ -670,37 +651,54 @@ def get_scattered_dataset(loader, scattering, device, data_size):
     return data
 
 
-def get_scattered_loader(loader, scattering, device, drop_last=False, sample_batches=False):
+def get_scattered_loader(loader, scattering, device, drop_last=False, sample_batches=False, aug_mult=True, num_augm_mult=8):
     # pre-compute a scattering transform (if there is one) and return
     # a DataLoader
 
     scatters = []
     targets = []
 
+    if aug_mult:
+        aug = transforms.Compose([
+            transforms.Pad(4, padding_mode='reflect'), 
+            transforms.RandomCrop((224, 224)), 
+            transforms.RandomHorizontalFlip()])
+
     total_batches = len(loader.dataset) // loader.batch_size
 
     scatter_counter = 0
     target_counter = 0
-    for index, (data, target) in enumerate(tqdm(loader, total=total_batches)):
-        data, target = data.to(device), target.to(device)
+    for index, (img, target) in enumerate(tqdm(loader, total=total_batches)):   # when using augmult, batch size should be 1
+        img, target = img.to(device), target.to(device)
         if scattering is not None:
-            data = scattering(data)
+            data = scattering(img)
 
-        for tensor in data:
-            print("Data Shape: ", data.shape, "Tensor shape: ", tensor.shape)
-            tensor_file_name = '/share/TheSalon_Benchmarks/embeddings/chexlocalize/train/scatters/scatters' + str(scatter_counter) + '.pt'
+        if aug_mult:
+            for i in range(num_augm_mult - 1):
+                import pdb; pdb.set_trace()
+                aug_img = aug(img).contiguous()
+                if scattering is not None:
+                    aug_data = scattering(aug_img)
+                data = torch.cat((data, aug_data), dim=0)
+                del aug_data, aug_img
 
-            tensor_cloned = tensor.clone()
+        # for tensor in data:
+        print("Data Shape: ", data.shape)
 
-            torch.save(tensor_cloned, tensor_file_name)
+        data_file_name = '/shared/shared_1/embeddings/chexpert_tensors_augmented_8/train/scatters/scatters' + str(scatter_counter) + '.pt'
 
-            scatter_counter += 1
-            print("Saved file ", tensor_file_name)
-            print("Counter", scatter_counter)
-        del data
+        data_cloned = data.clone()
+
+        torch.save(data_cloned, data_file_name)
+
+        scatter_counter += 1
+        print("Saved file ", data_file_name)
+        print("Counter", scatter_counter)
+        del data, img
+
         for t in target:
-            print("Targets Shape: ", target.shape, "target shape: ", t.shape)
-            target_file_name = '/share/TheSalon_Benchmarks/embeddings/chexlocalize/train/targets/targets' + str(target_counter) + '.pt'
+            print("Targets Shape: ", t.shape)
+            target_file_name = '/shared/shared_1/embeddings/chexpert_tensors_augmented_8/train/targets/targets' + str(target_counter) + '.pt'
 
             target_cloned = t.clone()
 
@@ -715,7 +713,7 @@ def get_scattered_loader(loader, scattering, device, drop_last=False, sample_bat
         del target
         torch.cuda.empty_cache()
 
-    print("iA Done!!")
+    print("Done!!")
     scatters = torch.cat(scatters, axis=0)
     targets = torch.cat(targets, axis=0)
 
@@ -733,3 +731,68 @@ def get_scattered_loader(loader, scattering, device, drop_last=False, sample_bat
                                            num_workers=0,
                                            pin_memory=False,
                                            drop_last=drop_last)
+    
+def create_scattered_features(loader, scattering, device, aug_multiplicity=False, n_augs=8, dataset="chexpert", data_type='train'):
+    if aug_multiplicity:
+        aug = transforms.Compose([
+            transforms.Pad(4, padding_mode='reflect'), 
+            transforms.RandomCrop((224, 224)), 
+            transforms.RandomHorizontalFlip()])
+
+    total_batches = len(loader.dataset) // loader.batch_size
+
+    scatter_counter = 0
+    target_counter = 0
+
+    train_path = f".data/{dataset}/{data_type}/scatters"
+    target_path = f".data/{dataset}/{data_type}/targets"
+    if not os.path.exists(train_path):
+        os.makedirs(train_path)
+    if not os.path.exists(target_path):
+        os.makedirs(target_path)
+
+    print("Starting to store the tensors...")
+    for index, (img, target) in enumerate(tqdm(loader, total=total_batches)):   # when using augmult, batch size should be 1
+        img, target = img.to(device), target.to(device)
+        if scattering is not None:
+            data = scattering(img)
+
+        if aug_multiplicity:
+            scatter_img_total = torch.tensor([]).to(device)
+            for i in range(img.size(0)):
+                scatter_img = scattering(img[i]).unsqueeze(0)
+                for j in range(n_augs - 1):
+                    aug_img = aug(img[i]).contiguous()
+                    if scattering is not None:
+                        aug_data = scattering(aug_img).unsqueeze(0)
+                    scatter_img = torch.cat((scatter_img, aug_data), dim=0)
+                    del aug_data, aug_img
+                scatter_img_total = torch.cat((scatter_img_total, scatter_img.unsqueeze(0)), dim=0)
+                
+            data = scatter_img_total
+            
+        for tensor in data:
+
+            data_file_name = f".data/{dataset}/{data_type}/scatters/scatters{scatter_counter}.pt"
+
+            data_cloned = tensor.clone()
+
+            torch.save(data_cloned, data_file_name)
+
+            scatter_counter += 1
+        del data, img
+
+        for t in target:
+            target_file_name = f".data/{dataset}/{data_type}/targets/targets{target_counter}.pt"
+
+            target_cloned = t.clone()
+
+            torch.save(target_cloned, target_file_name)
+
+            target_counter += 1
+
+        # scatters.append(data)
+        # targets.append(target)
+        del target
+        torch.cuda.empty_cache()
+    print("Finished storing the tensors...")
