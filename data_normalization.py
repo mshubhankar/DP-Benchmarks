@@ -21,7 +21,6 @@ def standardize(x, bn_stats):
     x *= (bn_var.view(view) != 0).float()
     return x
 
-
 def get_renyi_divergence(sample_rate, noise_multiplier, orders=ORDERS):
     rdp = torch.tensor(
         tf_privacy.compute_rdp(
@@ -98,9 +97,9 @@ def get_noise_mul_privbyiter(num_samples, batch_size, target_epsilon, epochs, ta
     return mul_low
 
 
-def data_normalization(train_loader, scattering, K, device,
-                          data_size, sample_size,
-                          noise_multiplier=1.0, orders=ORDERS, save_dir=None):
+def data_normalization(train_loader, scattering, K, device,data_size, sample_size, 
+                          noise_multiplier=1.0, orders=ORDERS, save_dir=None, 
+                          grad_sample_mode="no_op"):
     # privately compute the mean and variance of scatternet features to normalize
     # the data.
 
@@ -113,49 +112,69 @@ def data_normalization(train_loader, scattering, K, device,
         epsilon_norm, _ = get_privacy_spent(rdp)
 
     # try loading pre-computed stats
-    use_scattering = scattering
-    
+    # use_scattering = scattering is not None
+    use_scattering = True
+    assert use_scattering
     mean_path = os.path.join(save_dir, f"mean_bn_{sample_size}_{noise_multiplier}_{use_scattering}.npy")
     var_path = os.path.join(save_dir, f"var_bn_{sample_size}_{noise_multiplier}_{use_scattering}.npy")
 
     print(f"Using BN stats for {sample_size}/{data_size} samples")
     print(f"With noise_mul={noise_multiplier}, we get ε_norm = {epsilon_norm:.3f}")
 
-    #if folder exists
-    if os.path.exists(mean_path) and os.path.exists(var_path):
+    try:
         print(f"loading {mean_path}")
         mean = np.load(mean_path)
         var = np.load(var_path)
         print(mean.shape, var.shape)
-    else:
+    except OSError:
+
         # compute the scattering transform and the mean and squared mean of features
-        scatters = []
         mean = 0
         sq_mean = 0
         count = 0
+        mean_count = 0
+        scatters_sum = []
+        scatters_sum_sq = []
         for idx, (data, target) in enumerate(train_loader):
+            scatters = []
             with torch.no_grad():
                 data = data.to(device)
-                if scattering:
-                    data = scattering(data).view(-1, K, data.shape[2]//4, data.shape[3]//4)
+                if use_scattering is not None:
+                    if grad_sample_mode == "no_op":
+                        data = torch.mean(data, dim=1)
+                    # data = scattering(data).view(-1, K, data.shape[2]//4, data.shape[3]//4)
+                    data = data.view(-1, K, data.shape[3], data.shape[4])
                 if noise_multiplier == 0:
                     data = data.reshape(len(data), K, -1).mean(-1)
                     mean += data.sum(0).cpu().numpy()
                     sq_mean += (data**2).sum(0).cpu().numpy()
                 else:
                     scatters.append(data.cpu().numpy())
-
                 count += len(data)
                 if count >= sample_size:
                     break
+            if noise_multiplier > 0:
+                scatters = np.concatenate(scatters, axis=0)
+                scatters = np.transpose(scatters, (0, 2, 3, 1))
+                scatters_reshape = scatters.reshape(len(scatters), -1, K)
+                mean_count = scatters_reshape.shape[1]
+                scatters_sum.append(np.sum(scatters_reshape, axis=1))
+
+                scatters_reshape_sq = (scatters ** 2).reshape(len(scatters), -1, K)
+                scatters_sum_sq.append(np.sum(scatters_reshape_sq, axis=1))
 
         if noise_multiplier > 0:
-            scatters = np.concatenate(scatters, axis=0)
+            # scatters = np.concatenate(scatters, axis=0)
             # scatters = np.transpose(scatters, (0, 2, 3, 1))
-            scatters = scatters[:sample_size]
+
+            # scatters = scatters[:sample_size]
+
+            scatters_sum = np.concatenate(scatters_sum, axis=0)
+            scatters_sum_sq = np.concatenate(scatters_sum_sq, axis=0)
 
             # s x K
-            scatter_means = np.mean(scatters.reshape(len(scatters), -1, K), axis=1)
+            # scatter_means = np.mean(scatters.reshape(len(scatters), -1, K), axis=1)
+            scatter_means = scatters_sum / mean_count
             norms = np.linalg.norm(scatter_means, axis=-1)
 
             # technically a small privacy leak, sue me...
@@ -167,8 +186,9 @@ def data_normalization(train_loader, scattering, K, device,
                                      size=mean.shape) / sample_size
 
             # s x K
-            scatter_sq_means = np.mean((scatters ** 2).reshape(len(scatters), -1, K),
-                                       axis=1)
+            # scatter_sq_means = np.mean((scatters ** 2).reshape(len(scatters), -1, K),
+            #                            axis=1)
+            scatter_sq_means = scatters_sum_sq / mean_count
             norms = np.linalg.norm(scatter_sq_means, axis=-1)
 
             # technically a small privacy leak, sue me...
@@ -180,6 +200,7 @@ def data_normalization(train_loader, scattering, K, device,
                                         size=sq_mean.shape) / sample_size
             var = np.maximum(sq_mean - mean ** 2, 0)
         else:
+            print("BN without noise multiplier")
             mean /= count
             sq_mean /= count
             var = np.maximum(sq_mean - mean ** 2, 0)
@@ -193,3 +214,34 @@ def data_normalization(train_loader, scattering, K, device,
     var = torch.from_numpy(var).to(device)
 
     return (mean, var), rdp
+
+
+def priv_by_iter_guarantees(epochs, batch_size, samples, noise_multiplier, delta=1e-5, verbose=True):
+    """Tabulating position-dependent privacy guarantees."""
+    if noise_multiplier == 0:
+        if verbose:
+            print('No differential privacy (additive noise is 0).')
+        return np.inf
+
+    if verbose:
+        print('In the conditions of Theorem 34 (https://arxiv.org/abs/1808.06651) '
+              'the training procedure results in the following privacy guarantees.')
+        print('Out of the total of {} samples:'.format(samples))
+
+    steps_per_epoch = samples // batch_size
+    orders = np.concatenate([np.linspace(2, 20, num=181), np.linspace(20, 100, num=81)])
+    for p in (.5, .9, .99):
+        steps = math.ceil(steps_per_epoch * p)  # Steps in the last epoch.
+        coef = 2 * (noise_multiplier)**-2 * (
+            # Accounting for privacy loss
+            (epochs - 1) / steps_per_epoch +  # ... from all-but-last epochs
+            1 / (steps_per_epoch - steps + 1))  # ... due to the last epoch
+        # Using RDP accountant to compute eps. Doing computation analytically is
+        # an option.
+        rdp = [order * coef for order in orders]
+        eps, _ = get_privacy_spent(rdp, delta, orders)
+        if verbose:
+            print('\t{:g}% enjoy at least ({:.2f}, {})-DP'.format(
+                p * 100, eps, delta))
+
+    return eps
