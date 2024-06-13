@@ -6,9 +6,9 @@ import torch.nn as nn
 from opacus import PrivacyEngine
 
 from utils import get_device, train, test, CheXpert_train, CheXpert_test
-from data import get_data, get_scatter_transform, get_scattered_loader
-from models.scatternet_model import CNNS, get_num_params, ScatterLinear
-from dp_utils import ORDERS, scatter_normalization
+from data import get_data, get_scatter_transform, create_scattered_features
+from _models.scatternet_model import CNNS, get_num_params, ScatterLinear
+from data_normalization import ORDERS, data_normalization
 
 from torchvision import models
 from opacus.validators import ModuleValidator
@@ -31,7 +31,39 @@ import math
 from torch.utils.data import random_split
 from sklearn.linear_model import LogisticRegression
 
-def main(dataset, augment=False, use_scattering=False, size=None,
+def store_scatter_features(dataset, augment=False, size=None,
+        minibatch_size=256, sample_batches=False,
+        lr=1, optim="Adam", momentum=0.9, nesterov=False,
+        clip_norm=0.1, epochs=100,
+        norm_flag=None, group_norm_groups=None, data_norm_sigma=None,
+        epsilon=None, logdir=None,
+        max_physical_batch_size=128, privacy=True,
+        weight_standardization=True, ema_flag=True, write_file=None, 
+        grad_sample_mode="no_op", log_file=None,
+        aug_multiplicity=False, n_augs=8, device="cpu", 
+        result_file_csv=None, output_dim=5, layer='cnn'):
+
+    print("CUDA: ", torch.cuda.is_available())
+
+    train_data, test_data = get_data(dataset, augment=augment)
+    print("Size of train data and test data: ", len(train_data), len(test_data))
+
+    scattering, K, _ = get_scatter_transform(dataset)
+    scattering.to(device)
+    print("K: ", K)
+
+
+    # SET UP LOADER
+    train_loader = torch.utils.data.DataLoader(
+        train_data, batch_size=minibatch_size, shuffle=True, num_workers=0, pin_memory=False)
+    test_loader = torch.utils.data.DataLoader(
+        test_data, batch_size=minibatch_size, shuffle=False, num_workers=0, pin_memory=False)
+
+    # Create features
+    create_scattered_features(train_loader, scattering, device, aug_multiplicity, n_augs, dataset=dataset, data_type='train')
+    create_scattered_features(test_loader, scattering, device, aug_multiplicity, n_augs, dataset=dataset, data_type='test')
+
+def main(dataset, augment=False, size=None,
         minibatch_size=256, sample_batches=False,
         lr=1, optim="SGD", momentum=0.9, nesterov=False,
         clip_norm=0.1, epochs=100,
@@ -49,12 +81,7 @@ def main(dataset, augment=False, use_scattering=False, size=None,
     print("Non-private. Data size of tensor T: ", train_data[0][0].shape, train_data[0][1].dtype)
 
 
-    if use_scattering:
-        scattering, K, _ = get_scatter_transform(dataset)
-        scattering.to(device)
-        print("K: ", K)
-    else:
-        scattering, K, (h, w) = None, 243, (56, 56)
+    scattering, K, (h, w) = None, 243, (56, 56)
 
 
     # SET UP LOADER
@@ -69,7 +96,7 @@ def main(dataset, augment=False, use_scattering=False, size=None,
         # compute noisy data statistics or load from disk if pre-computed
         save_dir = f"bn_stats/{dataset}"
         os.makedirs(save_dir, exist_ok=True)
-        bn_stats, rdp_norm = scatter_normalization(train_loader,
+        bn_stats, rdp_norm = data_normalization(train_loader,
                                                    scattering,
                                                    K,
                                                    device,
@@ -90,17 +117,6 @@ def main(dataset, augment=False, use_scattering=False, size=None,
 
     model.to(device)
 
-    # if use_scattering and augment:
-    #    model = nn.Sequential(scattering, model)
-    #    train_loader = torch.utils.data.DataLoader(
-    #        train_data, batch_size=minibatch_size, shuffle=True,
-    #        num_workers=1, pin_memory=True, drop_last=True)
-    # else:
-    #    # pre-compute the scattering transform if necessary
-    #    train_loader = get_scattered_loader(train_loader, scattering, device,
-    #                                        drop_last=True, sample_batches=sample_batches)
-    #    test_loader = get_scattered_loader(test_loader, scattering, device)
-
     print(f"model has {get_num_params(model)} parameters")
 
     if optim == "SGD":
@@ -120,10 +136,10 @@ def main(dataset, augment=False, use_scattering=False, size=None,
     for epoch in range(0, epochs):
         print(f"\nEpoch: {epoch}")
         
-        if dataset == 'chexpert_tensors' or dataset == 'chexpert_tensors_augmented':
+        if dataset == 'chexpert_tensors':
             train_loss, train_acc, train_val_auc_mean = CheXpert_train(model, train_loader, optimizer, ema, max_physical_batch_size=max_physical_batch_size, grad_sample_mode=grad_sample_mode)
             test_loss, test_acc, test_val_auc_mean, ema_test_loss, ema_test_acc, ema_test_val_auc_mean = CheXpert_test(model, test_loader, ema)
-        elif dataset == 'eyepacs_complete_tensors' or dataset == 'eyepacs_complete_tensors_augmented':
+        elif dataset == 'eyepacs_tensors':
             train_loss, train_acc, train_val_auc_mean = train(model, train_loader, optimizer, ema, max_physical_batch_size=max_physical_batch_size, grad_sample_mode=grad_sample_mode)
             test_loss, test_acc, test_val_auc_mean, ema_test_loss, ema_test_acc, ema_test_val_auc_mean = test(model, test_loader, ema)
         
@@ -138,9 +154,7 @@ def main(dataset, augment=False, use_scattering=False, size=None,
         log_file.write(f'Train set: Average loss: {train_loss}, Accuracy: {train_acc}, AUC: {train_val_auc_mean}\n')
         log_file.write(f'Test set: Average loss: {test_loss}, Accuracy: {test_acc}, AUC: {test_val_auc_mean}\n')
 
-    log_file.close()
-
-def private_main(dataset, augment=False, use_scattering=False, size=None,
+def private_main(dataset, augment=False, size=None,
         minibatch_size=256, sample_batches=False,
         lr=1, optim="Adam", momentum=0.9, nesterov=False,
         clip_norm=0.1, epochs=100,
@@ -162,12 +176,7 @@ def private_main(dataset, augment=False, use_scattering=False, size=None,
     DELTA = 10 ** -(math.ceil(math.log10(n)))
     print("DELTA: ", DELTA)
 
-    if use_scattering:
-        scattering, K, _ = get_scatter_transform(dataset)
-        scattering.to(device)
-        print("K: ", K)
-    else:
-        scattering, K, (h, w) = None, 243, (56, 56)
+    scattering, K, (h, w) = None, 243, (56, 56)
 
 
     # SET UP LOADER
@@ -182,7 +191,7 @@ def private_main(dataset, augment=False, use_scattering=False, size=None,
         # compute noisy data statistics or load from disk if pre-computed
         save_dir = f"bn_stats/{dataset}"
         os.makedirs(save_dir, exist_ok=True)
-        bn_stats, rdp_norm = scatter_normalization(train_loader,
+        bn_stats, rdp_norm = data_normalization(train_loader,
                                                    scattering,
                                                    K,
                                                    device,
@@ -203,17 +212,6 @@ def private_main(dataset, augment=False, use_scattering=False, size=None,
             model = ScatterLinear(K, (h, w), input_norm=norm_flag, classes=output_dim, num_groups=group_norm_groups)
 
     model.to(device)
-
-    # if use_scattering and augment:
-    #    model = nn.Sequential(scattering, model)
-    #    train_loader = torch.utils.data.DataLoader(
-    #        train_data, batch_size=minibatch_size, shuffle=True,
-    #        num_workers=1, pin_memory=True, drop_last=True)
-    # else:
-    #    # pre-compute the scattering transform if necessary
-    #    train_loader = get_scattered_loader(train_loader, scattering, device,
-    #                                        drop_last=True, sample_batches=sample_batches)
-    #    test_loader = get_scattered_loader(test_loader, scattering, device)
 
     print(f"model has {get_num_params(model)} parameters")
 
@@ -266,10 +264,10 @@ def private_main(dataset, augment=False, use_scattering=False, size=None,
     for epoch in range(0, epochs):
         print(f"\nEpoch: {epoch}")
 
-        if dataset == 'chexpert_tensors' or dataset == 'chexpert_tensors_augmented':
+        if dataset == 'chexpert_tensors':
             train_loss, train_acc, train_val_auc_mean = CheXpert_train(model, train_loader, optimizer, ema, max_physical_batch_size=max_physical_batch_size, grad_sample_mode=grad_sample_mode)
             test_loss, test_acc, test_val_auc_mean, ema_test_loss, ema_test_acc, ema_test_val_auc_mean = CheXpert_test(model, test_loader, ema)
-        elif dataset == 'eyepacs_complete_tensors' or dataset == 'eyepacs_complete_tensors_augmented':
+        elif dataset == 'eyepacs_tensors':
             train_loss, train_acc, train_val_auc_mean = train(model, train_loader, optimizer, ema, max_physical_batch_size=max_physical_batch_size, grad_sample_mode=grad_sample_mode)
             test_loss, test_acc, test_val_auc_mean, ema_test_loss, ema_test_acc, ema_test_val_auc_mean = test(model, test_loader, ema)
 
@@ -277,39 +275,48 @@ def private_main(dataset, augment=False, use_scattering=False, size=None,
             
             print(f"privacy engine: {privacy_engine.accountant.history}")
             epsilon_calculated = privacy_engine.get_epsilon(delta=DELTA)
-            print(f"ε = {epsilon:.2f}")
+            print(f"ε = {epsilon_calculated:.2f}")
 
             if epsilon is not None and epsilon_calculated >= epsilon:
                 return
         else:
-            epsilon = None
+            epsilon_calculated = None
 
         log_file.write(f'Train set: Average loss: {train_loss}, Accuracy: {train_acc}, AUC: {train_val_auc_mean}\n')
         log_file.write(f'Test set: Average loss: {test_loss}, Accuracy: {test_acc}, AUC: {test_val_auc_mean}\n')
         log_file.write(f'EMA Test set: Average loss: {ema_test_loss}, Accuracy: {ema_test_acc}, AUC: {ema_test_val_auc_mean}\n')
-        log_file.write(f'Epsilon without considering DataNorm: {epsilon}\n')
+        log_file.write(f'Epsilon without considering DataNorm: {epsilon_calculated}\n')
 
     if norm_flag == "DataNorm":  # add DataNorm privacy step for DataNorm
         privacy_engine.accountant.step(noise_multiplier=data_norm_sigma, sample_rate=1)
         privacy_engine.accountant.step(noise_multiplier=data_norm_sigma, sample_rate=1)
         log_file.write(f'Final Epsilon Value with DataNorm: {privacy_engine.get_epsilon(delta=DELTA)}\n')
-    
-    log_file.close()
 
 def train_scatternet(params):
+    reps = params['reps']
+    params['layer'] = params['model']
     model = params['model']
     privacy = params['privacy']
+
+    params['grad_sample_mode'] = "no_op" if params['aug_multiplicity'] else None
 
     del params['baseline']
     del params['mode']
     del params['reps']
-
-    params['layer'] = params['model']
     del params['model']
 
-    if privacy:
-        print(f"Running private {model}")
-        private_main(**params)
-    else:
-        print(f"Running non-private {model}")
-        main(**params)
+    # create ScatterNet tensors
+    store_scatter_features(**params)    # features are now stored at ./data/dataset/. Remove this if you already have the tensors stored.
+
+    # point to ScatterNet tensors
+    params['dataset'] = f"{params['dataset']}_tensors"
+
+    for rep in range(reps):
+        if privacy:
+            print(f"Running private {model}")
+            private_main(**params)
+        else:
+            print(f"Running non-private {model}")
+            main(**params)
+    params['log_file'].close()
+    params['result_file_csv'].close()
