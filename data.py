@@ -492,7 +492,7 @@ def create_scattered_features(loader, scattering, device, aug_multiplicity=False
         os.makedirs(target_path)
 
     print("Starting to store the tensors...")
-    for index, (img, target) in enumerate(tqdm(loader, total=total_batches)):   # when using augmult, batch size should be 1
+    for index, (img, target) in enumerate(tqdm(loader, total=total_batches)):
         img, target = img.to(device), target.to(device)
         if scattering is not None:
             data = scattering(img)
