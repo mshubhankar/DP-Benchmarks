@@ -41,7 +41,7 @@ class get_feature(Dataset):
         y_test_path = os.path.join(self.root_dir, f'{params["dataset"]}_test_Y.pt')
 
         # make features if not already made
-        if not os.path.exists(x_train_path):
+        if not os.path.exists(x_train_path) or not os.path.exists(x_test_path):
             print('Making features')
             utils.make_features(params, self.root_dir)
 
@@ -80,7 +80,7 @@ def train_clip(params):
     target_delta = float(f'1e-{len(str(len(train_set)))}')
     if 'chexpert' in params['dataset']:
             multi_label = True
-            avg_acc = torch.zeros(params['output_dim'].cpu())
+            avg_acc = torch.zeros(params['output_dim']).cpu()
             avg_train_acc = torch.zeros(params['output_dim']).cpu()
     else:
         multi_label = False
@@ -106,7 +106,7 @@ def train_clip(params):
     
     norm_stats = None
     if params['norm_flag'] == "DataNorm":
-        save_dir = f"norm_stats_g14/{params['dataset']}"
+        save_dir = f"norm_stats/norm_stats_{params['baseline']}/{params['dataset']}"
         os.makedirs(save_dir, exist_ok=True)
         norm_loader = DataLoader(train_set, batch_size= params['minibatch_size'], shuffle=True)
         norm_stats, rdp = data_normalization(norm_loader, False, data_features, params['device'],\
@@ -173,9 +173,9 @@ def train_clip(params):
         if params['aug_multiplicity'] :
             fmodel, _fparams = make_functional(model)
                             
-            def compute_loss_stateless_model(params, sample, target):
+            def compute_loss_stateless_model(m_params, sample, target):
                 target = target.repeat(params['n_augs'], 1)
-                predictions = fmodel(params, sample)
+                predictions = fmodel(m_params, sample)
                 loss = criterion(predictions, target)
                 return loss
 
@@ -183,7 +183,7 @@ def train_clip(params):
             ft_compute_sample_grad = vmap(ft_compute_grad, in_dims = (None, 0, 0))
             # Using model.parameters() instead of fparams
             # as fparams seems to not point to the dynamically updated parameters
-            params = list(model.parameters())
+            model_params = list(model.parameters())
             
 
 
@@ -197,12 +197,12 @@ def train_clip(params):
                 if params['aug_multiplicity']:
 
                     per_sample_grads, per_sample_losses = ft_compute_sample_grad(
-                        params, X, Y
+                        model_params, X, Y
                     )
                     per_sample_grads = [g.detach() for g in per_sample_grads]
                     
                     loss = torch.mean(per_sample_losses)
-                    for p, g in zip(params, per_sample_grads):
+                    for p, g in zip(model_params, per_sample_grads):
                         p.grad_sample = g
                     
                 else:
@@ -221,9 +221,9 @@ def train_clip(params):
             del X, Y
             del train_pred, train_true
 
-        if params['privacy']:
-            epsilon = privacy_engine.get_epsilon(target_delta)
-            print(f'Epsilon after epoch {epoch}: {epsilon}')
+            if params['privacy']:
+                epsilon = privacy_engine.get_epsilon(target_delta)
+                print(f'Epsilon after epoch {epoch}: {epsilon}')
 
 
         # test the model
@@ -292,7 +292,9 @@ def train_clip(params):
     if params['privacy']:
         params['log_file'].write(f'Noise multiplier: {optimizer.noise_multiplier}\n\n')
 
-    params['result_file_csv'].write(f"{params['dataset']},{params['epochs']},{params['privacy']},{epsilon},{target_delta},{params['clip_norm']},Adam,0.001,False,{params['ema_flag']},{params['minibatch_size']},{params['norm_flag']},{sum(avg_train_auc) / len(avg_train_auc)},{std_train_auc},{sum(avg_auc) / len(avg_auc)},{avg_acc}, {std_dev_auc}\n")
-
+    if params['privacy']:
+        params['result_file_csv'].write(f"{params['dataset']},{params['epochs']},{params['privacy']},{epsilon},{target_delta},{params['clip_norm']},Adam,0.001,False,{params['ema_flag']},{params['minibatch_size']},{params['norm_flag']},{sum(avg_train_auc) / len(avg_train_auc)},{std_train_auc},{sum(avg_auc) / len(avg_auc)},{std_dev_auc},{avg_acc}\n")
+    else:
+        params['result_file_csv'].write(f"{params['dataset']},{params['epochs']},{params['privacy']},None,None,{params['clip_norm']},Adam,0.001,False,{params['ema_flag']},{params['minibatch_size']},{params['norm_flag']},{sum(avg_train_auc) / len(avg_train_auc)},{std_train_auc},{sum(avg_auc) / len(avg_auc)},{std_dev_auc},{avg_acc}\n")
     params['log_file'].close()
     params['result_file_csv'].close()

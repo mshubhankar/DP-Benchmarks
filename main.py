@@ -37,14 +37,18 @@ for conf in variables:
         os.makedirs(result_dir)
     time_stamp_now = time.strftime("%Y%m%d-%H%M%S")
 
-    result_file_excel = open(f'{result_dir}/{time_stamp_now}_{params["baseline"]}_{params["dataset"]}_{params["n_augs"]}_{params["model"]}_epochs{params["epochs"]}_privacy{params["privacy"]}_reps{params["reps"]}_ema{params["ema_flag"]}_norm{params["norm_flag"]}_{params["group_norm_groups"]}_batchsize{params["minibatch_size"]}_excel.csv', 'w')
-
-    log_file = open(f'{result_dir}/{time_stamp_now}_{params["baseline"]}_{params["dataset"]}_{params["n_augs"]}_{params["model"]}_epochs{params["epochs"]}_privacy{params["privacy"]}_reps{params["reps"]}_ema{params["ema_flag"]}_norm{params["norm_flag"]}{params["group_norm_groups"]}_batchsize{params["minibatch_size"]}_excel.txt', 'w')
+    if params['aug_multiplicity']:
+        result_file_excel = open(f'{result_dir}/{time_stamp_now}_{params["baseline"]}_{params["dataset"]}_aug_{params["n_augs"]}_{params["model"]}_epochs{params["epochs"]}_privacy{params["privacy"]}_reps{params["reps"]}_ema{params["ema_flag"]}_norm{params["norm_flag"]}_{params["group_norm_groups"]}_batchsize{params["minibatch_size"]}_excel.csv', 'w')
+        log_file = open(f'{result_dir}/{time_stamp_now}_{params["baseline"]}_{params["dataset"]}_aug_{params["n_augs"]}_{params["model"]}_epochs{params["epochs"]}_privacy{params["privacy"]}_reps{params["reps"]}_ema{params["ema_flag"]}_norm{params["norm_flag"]}{params["group_norm_groups"]}_batchsize{params["minibatch_size"]}_excel.txt', 'w')
+    
+    else:
+        result_file_excel = open(f'{result_dir}/{time_stamp_now}_{params["baseline"]}_{params["dataset"]}_{params["model"]}_epochs{params["epochs"]}_privacy{params["privacy"]}_reps{params["reps"]}_ema{params["ema_flag"]}_norm{params["norm_flag"]}_{params["group_norm_groups"]}_batchsize{params["minibatch_size"]}_excel.csv', 'w')
+        log_file = open(f'{result_dir}/{time_stamp_now}_{params["baseline"]}_{params["dataset"]}_{params["model"]}_epochs{params["epochs"]}_privacy{params["privacy"]}_reps{params["reps"]}_ema{params["ema_flag"]}_norm{params["norm_flag"]}{params["group_norm_groups"]}_batchsize{params["minibatch_size"]}_excel.txt', 'w')
 
     params['result_file_csv'] = result_file_excel
     params['log_file'] = log_file
 
-    result_file_excel.write('name,epochs,privacy,epsilon,delta,max_grad_norm,optim,LR,WS,EMA,BatchSize,input_norm,train_auc,train_auc_std_test_auc,test_auc_std, test_acc\n')
+    result_file_excel.write('name,epochs,privacy,epsilon,delta,max_grad_norm,optim,LR,WS,EMA,BatchSize,input_norm,train_auc,train_auc_std,test_auc,test_auc_std, test_acc\n')
 
     if 'clip' in params['baseline']:
         clip_train.train_clip(params)

@@ -112,69 +112,49 @@ def data_normalization(train_loader, scattering, K, device,data_size, sample_siz
         epsilon_norm, _ = get_privacy_spent(rdp)
 
     # try loading pre-computed stats
-    # use_scattering = scattering is not None
-    use_scattering = True
-    assert use_scattering
+    use_scattering = scattering
+    
     mean_path = os.path.join(save_dir, f"mean_bn_{sample_size}_{noise_multiplier}_{use_scattering}.npy")
     var_path = os.path.join(save_dir, f"var_bn_{sample_size}_{noise_multiplier}_{use_scattering}.npy")
 
     print(f"Using BN stats for {sample_size}/{data_size} samples")
     print(f"With noise_mul={noise_multiplier}, we get ε_norm = {epsilon_norm:.3f}")
 
-    try:
-        print(f"loading {mean_path}")
+    # if norm stats already path exists, don't compute again
+    if os.path.exists(mean_path) and os.path.exists(var_path):
+        
         mean = np.load(mean_path)
         var = np.load(var_path)
         print(mean.shape, var.shape)
-    except OSError:
-
-        # compute the scattering transform and the mean and squared mean of features
+    else:
+       # compute the scattering transform and the mean and squared mean of features
+        scatters = []
         mean = 0
         sq_mean = 0
         count = 0
-        mean_count = 0
-        scatters_sum = []
-        scatters_sum_sq = []
         for idx, (data, target) in enumerate(train_loader):
-            scatters = []
             with torch.no_grad():
                 data = data.to(device)
-                if use_scattering is not None:
-                    if grad_sample_mode == "no_op":
-                        data = torch.mean(data, dim=1)
-                    # data = scattering(data).view(-1, K, data.shape[2]//4, data.shape[3]//4)
-                    data = data.view(-1, K, data.shape[3], data.shape[4])
+                if scattering:
+                    data = scattering(data).view(-1, K, data.shape[2]//4, data.shape[3]//4)
                 if noise_multiplier == 0:
                     data = data.reshape(len(data), K, -1).mean(-1)
                     mean += data.sum(0).cpu().numpy()
                     sq_mean += (data**2).sum(0).cpu().numpy()
                 else:
                     scatters.append(data.cpu().numpy())
+
                 count += len(data)
                 if count >= sample_size:
                     break
-            if noise_multiplier > 0:
-                scatters = np.concatenate(scatters, axis=0)
-                scatters = np.transpose(scatters, (0, 2, 3, 1))
-                scatters_reshape = scatters.reshape(len(scatters), -1, K)
-                mean_count = scatters_reshape.shape[1]
-                scatters_sum.append(np.sum(scatters_reshape, axis=1))
-
-                scatters_reshape_sq = (scatters ** 2).reshape(len(scatters), -1, K)
-                scatters_sum_sq.append(np.sum(scatters_reshape_sq, axis=1))
 
         if noise_multiplier > 0:
-            # scatters = np.concatenate(scatters, axis=0)
+            scatters = np.concatenate(scatters, axis=0)
             # scatters = np.transpose(scatters, (0, 2, 3, 1))
-
-            # scatters = scatters[:sample_size]
-
-            scatters_sum = np.concatenate(scatters_sum, axis=0)
-            scatters_sum_sq = np.concatenate(scatters_sum_sq, axis=0)
+            scatters = scatters[:sample_size]
 
             # s x K
-            # scatter_means = np.mean(scatters.reshape(len(scatters), -1, K), axis=1)
-            scatter_means = scatters_sum / mean_count
+            scatter_means = np.mean(scatters.reshape(len(scatters), -1, K), axis=1)
             norms = np.linalg.norm(scatter_means, axis=-1)
 
             # technically a small privacy leak, sue me...
@@ -186,9 +166,8 @@ def data_normalization(train_loader, scattering, K, device,data_size, sample_siz
                                      size=mean.shape) / sample_size
 
             # s x K
-            # scatter_sq_means = np.mean((scatters ** 2).reshape(len(scatters), -1, K),
-            #                            axis=1)
-            scatter_sq_means = scatters_sum_sq / mean_count
+            scatter_sq_means = np.mean((scatters ** 2).reshape(len(scatters), -1, K),
+                                       axis=1)
             norms = np.linalg.norm(scatter_sq_means, axis=-1)
 
             # technically a small privacy leak, sue me...
@@ -200,7 +179,6 @@ def data_normalization(train_loader, scattering, K, device,data_size, sample_siz
                                         size=sq_mean.shape) / sample_size
             var = np.maximum(sq_mean - mean ** 2, 0)
         else:
-            print("BN without noise multiplier")
             mean /= count
             sq_mean /= count
             var = np.maximum(sq_mean - mean ** 2, 0)
@@ -209,6 +187,7 @@ def data_normalization(train_loader, scattering, K, device,data_size, sample_siz
             print(f"saving mean and var: {mean.shape} {var.shape}")
             np.save(mean_path, mean)
             np.save(var_path, var)
+
 
     mean = torch.from_numpy(mean).to(device)
     var = torch.from_numpy(var).to(device)

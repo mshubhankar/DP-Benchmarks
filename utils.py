@@ -57,7 +57,10 @@ def print_metrics(pred, true, multi_label=False):
 
 
 def make_features(params, feature_path):
-    if 'g14' in params['baseline']:
+    if 'g14_clipa' in params['baseline']:
+        model, _, preprocess = open_clip.create_model_and_transforms('ViT-bigG-14-CLIPA', pretrained='datacomp1b')
+        tokenizer = open_clip.get_tokenizer('ViT-bigG-14-CLIPA')
+    elif 'g14' in params['baseline']:
         model, _, preprocess = open_clip.create_model_and_transforms('ViT-bigG-14', pretrained='laion2b_s39b_b160k')
         tokenizer = open_clip.get_tokenizer('ViT-bigG-14')
     elif 'b16' in params['baseline']:
@@ -74,58 +77,62 @@ def make_features(params, feature_path):
     train_data, test_data = get_data(params['dataset'], preprocess=preprocess, augment=False)
     
     train_loader = torch.utils.data.DataLoader(
-            train_data, batch_size=params['minibatch_size'], shuffle=False, num_workers=1, pin_memory=True)
+            train_data, batch_size=64, shuffle=False, num_workers=1, pin_memory=True)
 
     test_loader = torch.utils.data.DataLoader(
-                test_data, batch_size=params['minibatch_size'], shuffle=False, num_workers=1, pin_memory=True)
+                test_data, batch_size=64, shuffle=False, num_workers=1, pin_memory=True)
 
-
+    train_path = f"{feature_path}/{params['dataset']}_train_X.pt"
+    test_path = f"{feature_path}/{params['dataset']}_test_X.pt"
     if params['aug_multiplicity']:
         aug = transforms.Compose([
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomCrop(224, padding=4, padding_mode='reflect')])
-    
+        train_path = f"{feature_path}/{params['dataset']}_aug_{params['n_augs']}_train_X.pt"
+        test_path = f"{feature_path}/{params['dataset']}_aug_{params['n_augs']}_test_X.pt"
+
     tmp_path = '/tmp/'
     with torch.no_grad():
-        
-        for i, rows in enumerate(tqdm(train_loader)):
 
-            data, target = rows
-            data, target = data.to(params['device']), target.to(params['device'])
-            model = model.to(params['device'])
-            # text = text.to(params['device'])
-            image_features, text_features, _ = model(data, text)
-            
-            if params['aug_multiplicity']:
-                for j in range(params['n_augs']-1):
-                    data_aug = aug(data)
-                    with torch.no_grad():
-                        image_features_aug, _, _ = model(data_aug, text)
-                    
-                    # append image_features_aug to image_features so that [64,512] becomes [64,2,512]
-                    if len(image_features.shape) == 2:
-                        image_features = image_features.unsqueeze(1)
-                    image_features_aug = image_features_aug.unsqueeze(1)
-                    image_features = torch.cat((image_features, image_features_aug), dim=1)
-                    
-                    del data_aug, image_features_aug
-            
+        if not os.path.exists(train_path):
+            for i, rows in enumerate(tqdm(train_loader)):
+
+                data, target = rows
+                data, target = data.to(params['device']), target.to(params['device'])
+                model = model.to(params['device'])
+                text = text.to(params['device'])
+                image_features, text_features, _ = model(data, text)
                 
-            del data
-            
+                if params['aug_multiplicity']:
+                    for j in range(params['n_augs']-1):
+                        data_aug = aug(data)
+                        with torch.no_grad():
+                            image_features_aug, _, _ = model(data_aug, text)
+                        
+                        # append image_features_aug to image_features so that [64,512] becomes [64,2,512]
+                        if len(image_features.shape) == 2:
+                            image_features = image_features.unsqueeze(1)
+                        image_features_aug = image_features_aug.unsqueeze(1)
+                        image_features = torch.cat((image_features, image_features_aug), dim=1)
+                        
+                        del data_aug, image_features_aug
+                
+                    
+                del data
+                
 
-            #store output in a numpy file
-            if params['aug_multiplicity']:
-            
-                torch.save(image_features.cpu().detach(), f"{tmp_path}/{params['dataset']}_aug_{params['n_augs']}_train_X_part{i}.pt")
-                torch.save( target.cpu().detach(), f"{tmp_path}/{params['dataset']}_aug_{params['n_augs']}_train_Y_part{i}.pt")
-            else:
-                torch.save(image_features.cpu().detach(), f"{tmp_path}/{params['dataset']}_train_X_part{i}.pt")
-                torch.save( target.cpu().detach(), f"{tmp_path}/{params['dataset']}_train_Y_part{i}.pt")
+                #store output in a numpy file
+                if params['aug_multiplicity']:
+                
+                    torch.save(image_features.cpu().detach(), f"{tmp_path}/{params['dataset']}_aug_{params['n_augs']}_train_X_part{i}.pt")
+                    torch.save( target.cpu().detach(), f"{tmp_path}/{params['dataset']}_aug_{params['n_augs']}_train_Y_part{i}.pt")
+                else:
+                    torch.save(image_features.cpu().detach(), f"{tmp_path}/{params['dataset']}_train_X_part{i}.pt")
+                    torch.save( target.cpu().detach(), f"{tmp_path}/{params['dataset']}_train_Y_part{i}.pt")
 
 
         # if test_path does not exist
-        if not os.path.exists(f"{feature_path}/{params['dataset']}_test_X.pt"):
+        if not os.path.exists(test_path):
             for i, rows in enumerate(tqdm(test_loader)):
                 data, target = rows
                 data, target = data.to(params['device']), target.to(params['device'])
@@ -142,34 +149,38 @@ def make_features(params, feature_path):
     full_X = []
     full_Y = []
     # number of files that start with dataset_train_X_part
-    n_train_files = len([name for name in os.listdir(tmp_path) if name.startswith(f"{params['dataset']}_train_X_part")])
-    n_test_files = len([name for name in os.listdir(tmp_path) if name.startswith(f"{params['dataset']}_test_X_part")])
+    file_prefix = f"{params['dataset']}"
+    if params['aug_multiplicity']:
+        file_prefix = f"{params['dataset']}_aug_{params['n_augs']}"
+
+    n_train_files = len([name for name in os.listdir(tmp_path) if name.startswith(f"{file_prefix}_train_X_part")])
+    n_test_files = len([name for name in os.listdir(tmp_path) if name.startswith(f"{file_prefix}_test_X_part")])
 
     for i in tqdm(range(n_train_files)):
-        X = torch.load(tmp_path + f"{params['dataset']}_train_X_part{i}.pt")
-        Y = torch.load(tmp_path + f"{params['dataset']}_train_Y_part{i}.pt")
+        X = torch.load(tmp_path + f"/{file_prefix}_train_X_part{i}.pt")
+        Y = torch.load(tmp_path + f"/{file_prefix}_train_Y_part{i}.pt")
         full_X.append(X)
         full_Y.append(Y)
     full_X = torch.cat(full_X)
     full_Y = torch.cat(full_Y)
 
-    torch.save(full_X, feature_path + f"{params['dataset']}_train_X.pt")
-    torch.save(full_Y, feature_path + f"{params['dataset']}_train_Y.pt")
+    torch.save(full_X, feature_path + f"/{file_prefix}_train_X.pt")
+    torch.save(full_Y, feature_path + f"/{file_prefix}_train_Y.pt")
 
     # if test_path does not exist
     if not os.path.exists(f"{feature_path}/{params['dataset']}_test_X.pt"):
         full_X = []
         full_Y = []
         for i in tqdm(range(n_test_files)):
-            X = torch.load(tmp_path + f"{params['dataset']}_test_X_part{i}.pt")
-            Y = torch.load(tmp_path + f"{params['dataset']}_test_Y_part{i}.pt")
+            X = torch.load(tmp_path + f"/{params['dataset']}_test_X_part{i}.pt")
+            Y = torch.load(tmp_path + f"/{params['dataset']}_test_Y_part{i}.pt")
             full_X.append(X)
             full_Y.append(Y)
         full_X = torch.cat(full_X)
         full_Y = torch.cat(full_Y)
 
-        torch.save(full_X, feature_path + f"{params['dataset']}_test_X.pt")
-        torch.save(full_Y, feature_path + f"{params['dataset']}_test_Y.pt")
+        torch.save(full_X, feature_path + f"/{params['dataset']}_test_X.pt")
+        torch.save(full_Y, feature_path + f"/{params['dataset']}_test_Y.pt")
 
 class CrossEntropyLoss(torch.nn.Module):
     def __init__(self):
