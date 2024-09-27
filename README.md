@@ -33,7 +33,7 @@ Datasets can be obtained from the following links:
 
 Please downlad the raw files in a folder data/raw
 
-The weights for the WRN 28-10 pretrained on ImageNet-1k can be found here: [WRN 28-10](https://drive.google.com/file/d/15k4ET2WM35pDWha1TWPfqkNB-_foYaV-/view?usp=sharing)
+The weights for the WRN 28-10 pretrained on ImageNet-1k can be found here: [WRN 28-10](https://drive.google.com/file/d/1BzqpD7qVZCY3p0Tt7euyW7rnqs_tGqae/view?usp=sharing)
 
 
 How to run
