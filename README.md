@@ -1,4 +1,5 @@
 # DP Benchmarks
+This repository contains the codebase for the paper [Rethinking Benchmarks for Differentially Private Image Classification](https://arxiv.org/abs/2601.17189).
 
 Prerequisites
 ===
@@ -29,7 +30,7 @@ Datasets
 
 Datasets can be obtained from the following links:
 1. [CheXpert](https://stanfordmlgroup.github.io/competitions/chexpert/)
-2. [EyePACS](https://paperswithcode.com/dataset/kaggle-eyepacs)
+2. EyePACS: [Data](https://www.kaggle.com/competitions/diabetic-retinopathy-detection/data) [TestLabels](https://www.kaggle.com/competitions/diabetic-retinopathy-detection/discussion/16149)
 
 Please downlad the raw files in a folder data/raw
 
